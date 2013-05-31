@@ -39,8 +39,6 @@ from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateErro
 # Import Trust Stores and EV data (OIDs and fingerprints) during module init.
 DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
 MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
-MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
-                                  os.path.join(DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
 
 EV_DB = {}
 ev_dirname = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
