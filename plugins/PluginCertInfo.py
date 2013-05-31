@@ -34,6 +34,14 @@ from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, constants, \
 from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 
 
+
+# Import Trust Stores and EV data (OIDs and fingerprints) during module init.
+DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
+MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
+MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
+                                  os.path.join(DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
+
+
 class X509CertificateHelper:
     # TODO: Move this somewhere else
     """
@@ -42,6 +50,7 @@ class X509CertificateHelper:
     
     def __init__(self, certificate):
         self._cert = certificate
+
         
     def parse_certificate(self):
         cert_dict = \
@@ -202,7 +211,7 @@ class PluginCertInfo(PluginBase.PluginBase):
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
-        self._load_multiple_trust_stores()
+
         ctSSL_initialize()
         try: # Get the certificate
             (cert, verify_result) = self._get_cert(target)
@@ -279,13 +288,6 @@ class PluginCertInfo(PluginBase.PluginBase):
         ctSSL_cleanup()
         return PluginBase.PluginResult(txt_result, xml_result)
 
-    def _load_multiple_trust_stores(self):
-        # Import Mozilla trust store and EV OIDs
-        self.DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
-        self.MOZILLA_CA_STORE = os.path.join(self.DATA_PATH, 'mozilla_cacert.pem')
-        self.MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
-                                os.path.join(self.DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
-
 
 # FORMATTING FUNCTIONS
 
@@ -312,7 +314,7 @@ class PluginCertInfo(PluginBase.PluginBase):
     def _is_ev_certificate(self, cert_dict):
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
-            if policy[0] in self.MOZILLA_EV_OIDS:
+            if policy[0] in MOZILLA_EV_OIDS:
                 return True
         except:
             return False
@@ -352,7 +354,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         """
         verify_result = None
         ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
-        ssl_ctx.load_verify_locations(self.MOZILLA_CA_STORE)
+        ssl_ctx.load_verify_locations(MOZILLA_CA_STORE)
         ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
         ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
                                           hello_workaround=True)
