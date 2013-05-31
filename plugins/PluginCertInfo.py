@@ -226,7 +226,6 @@ class PluginCertInfo(PluginBase.PluginBase):
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
-
         ctSSL_initialize()
         try: # Get the certificate
             (cert, verify_result) = self._get_cert(target)
@@ -304,8 +303,6 @@ class PluginCertInfo(PluginBase.PluginBase):
         return PluginBase.PluginResult(txt_result, xml_result)
 
 
-# FORMATTING FUNCTIONS
-
     def _is_hostname_valid(self, cert_dict, target):
         (host, ip, port) = target
         
@@ -324,13 +321,22 @@ class PluginCertInfo(PluginBase.PluginBase):
                 return 'Subject Alternative Name'       
         
         return False
-        
 
+    
     def _is_ev_certificate(self, cert_dict):
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
-            if policy[0] in MOZILLA_EV_OIDS:
-                return True
+
+            ev_result = {}
+            loaded_ev = EV_DB.keys()
+            for ev_name in loaded_ev:
+                ev_match = False
+                ev_db_list = EV_DB[ev_name]
+                for db in ev_db_list:
+                    if policy[0] == db['oid']:
+                        ev_match = True
+                ev_result[ev_name] = ev_match
+            return ev_match
         except:
             return False
         return False
