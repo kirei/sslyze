@@ -258,10 +258,15 @@ class PluginCertInfo(PluginBase.PluginBase):
         trust_txt = 'Certificate is Trusted' if is_cert_trusted \
                                              else 'Certificate is NOT Trusted'
 
-        is_ev = self._is_ev_certificate(cert_dict)
-        if is_ev:
-            trust_txt = trust_txt + ' - Extended Validation'
-            
+        ev_result = self._is_ev_certificate(cert_dict)
+        is_ev = False
+        for ev in ev_result:
+            if ev_result[ev]:
+                is_ev = True
+                trust_txt = trust_txt + ' - Extended Validation with %s' % ev
+            else:
+                trust_txt = trust_txt + ' - Not Extended Validation with %s' % ev
+                
         if untrusted_reason:
             trust_txt = trust_txt + ': ' + untrusted_reason
 
@@ -335,10 +340,12 @@ class PluginCertInfo(PluginBase.PluginBase):
                 for db in ev_db_list:
                     if policy[0] == db['oid']:
                         ev_match = True
+                        
                 ev_result[ev_name] = ev_match
-            return ev_match
+                
+            return ev_result
         except:
-            return False
+            return ev_result
         return False
         
     
