@@ -37,20 +37,21 @@ from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateErro
 
 
 # Import Trust Stores and EV data (OIDs and fingerprints) during module init.
-DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
-MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
-
 EV_DB = {}
-ev_dirname = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
-all_files = os.listdir(ev_dirname)
+load_data_path = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
+all_data_files = os.listdir(load_data_path)
 ev_files_to_load = []
-for filename in all_files:
-    if "_ev_" and "json" in filename:
+ca_files_to_load = []
+for filename in all_data_files:
+    if "_ev_" and ".json" in filename:
         ev_files_to_load.append(filename)
+
+    if ".pem" in filename:
+        ca_files_to_load.append(os.path.join(load_data_path, filename))
 
 for filename in ev_files_to_load:
     name = filename.split('_')
-    with open(os.path.join(ev_dirname, filename)) as json_file:
+    with open(os.path.join(load_data_path, filename)) as json_file:
         json_data = json.load(json_file)
     EV_DB[name[0]] = json_data
 
@@ -380,7 +381,8 @@ class PluginCertInfo(PluginBase.PluginBase):
         """
         verify_result = None
         ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
-        ssl_ctx.load_verify_locations(MOZILLA_CA_STORE)
+        for ca_file in ca_files_to_load:
+            ssl_ctx.load_verify_locations(ca_file)
         ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
         ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
                                           hello_workaround=True)
