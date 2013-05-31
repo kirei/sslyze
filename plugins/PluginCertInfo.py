@@ -26,6 +26,7 @@
 import os
 import re
 import imp
+import json
 from xml.etree.ElementTree import Element
 
 from plugins import PluginBase
@@ -40,6 +41,20 @@ DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
 MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
 MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
                                   os.path.join(DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
+
+EV_DB = {}
+ev_dirname = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
+all_files = os.listdir(ev_dirname)
+ev_files_to_load = []
+for filename in all_files:
+    if "_ev_" and "json" in filename:
+        ev_files_to_load.append(filename)
+
+for filename in ev_files_to_load:
+    name = filename.split('_')
+    with open(os.path.join(ev_dirname, filename)) as json_file:
+        json_data = json.load(json_file)
+    EV_DB[name[0]] = json_data
 
 
 class X509CertificateHelper:
