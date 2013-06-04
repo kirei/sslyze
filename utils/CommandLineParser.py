@@ -168,7 +168,7 @@ class CommandLineParser():
         self._parser.add_option(
             '--verbosity',
             help= (
-                'Increases the verbosity of the program.'
+                'Increases the verbosity of the program. '
                 'Usable values in the range 0..3. Default is 0.'),
             type='int',
             dest='verbosity',
