@@ -95,7 +95,7 @@ class X509CertificateHelper:
                 cert_xml.append(xml_elem)
  
         return cert_xml
-
+            
 
     def _create_xml_node(self, key, value=''):
         key = key.replace(' ', '').strip() # Remove spaces
@@ -225,6 +225,9 @@ class PluginCertInfo(PluginBase.PluginBase):
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
+        if self._shared_settings['verbosity'] > 2:
+            print "Processing %s" % target[0]
+            
         ctSSL_initialize()
         try: # Get the certificate
             (cert, verify_result) = self._get_cert(target)
@@ -328,24 +331,27 @@ class PluginCertInfo(PluginBase.PluginBase):
 
     
     def _is_ev_certificate(self, cert_dict):
+        ev_result = {}
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
 
-            ev_result = {}
             loaded_ev = EV_DB.keys()
             for ev_name in loaded_ev:
                 ev_match = False
+                ev_result[ev_name] = ev_match
                 ev_db_list = EV_DB[ev_name]
                 for db in ev_db_list:
                     if policy[0] == db['oid']:
+                        if self._shared_settings['verbosity'] > 1:
+                            print "Matched OID: %s" % policy[0]
+                            print "Fingerprint: %s" % db['fingerprint']
                         ev_match = True
-                        
                 ev_result[ev_name] = ev_match
                 
             return ev_result
         except:
             return ev_result
-        return False
+        return ev_result
         
     
     def _get_basic_text(self, cert,  cert_dict):      
@@ -387,11 +393,15 @@ class PluginCertInfo(PluginBase.PluginBase):
         ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
                                           hello_workaround=True)
 
+        if self._shared_settings['verbosity'] > 2:
+            print "Shared settings:"
+            print self._shared_settings
+
         try: # Perform the SSL handshake
             ssl_connect.connect()
             cert = ssl_connect._ssl.get_peer_certificate()
             verify_result = ssl_connect._ssl.get_verify_result()
-        
+            
         except ClientCertificateError: # The server asked for a client cert
             # We can get the server cert anyway
             cert = ssl_connect._ssl.get_peer_certificate()
