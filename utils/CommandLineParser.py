@@ -180,7 +180,9 @@ class CommandLineParser():
             help= (
                 'Identifies the target server(s) as a SMTP or an XMPP server(s) '
                 'and scans the server(s) using STARTTLS. '
-                'STARTTLS should be \'smtp\' or \'xmpp\'.'),
+                'STARTTLS should be \'smtp\' or \'xmpp\'. '
+                'Alternatively \'auto\' can be given and the protocol will be '
+                'selected based on the given port number.'),
             dest='starttls',
             default=None)
     
