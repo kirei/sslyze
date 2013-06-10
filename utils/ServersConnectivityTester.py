@@ -300,7 +300,7 @@ class SMTPServerTester(SSLServerTester):
         if '250 ' not in s.recv(2048):
             raise InvalidTargetError(self._target_str, self.ERR_SMTP_REJECTED)
                 
-        # Semd a STARTTLS
+        # Send a STARTTLS
         s.send('STARTTLS\r\n')
         smtp_resp = s.recv(2048)
         if 'Ready to start TLS'  not in smtp_resp:
