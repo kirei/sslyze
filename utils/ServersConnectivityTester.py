@@ -172,6 +172,17 @@ class ServersConnectivityTester(ConnectivityTester):
           
  
     def _test_server(self, target, timeout):
+        starttls_ports = {25:'smtp', 587:'smtp', 5222:'xmpp', 5269:'xmpp'}
+        target_port = target.split(':')
+        
+        if self._starttls == 'auto':
+            if len(target_port) == 2:
+                if int(target_port[1]) in starttls_ports:
+                    self._starttls = starttls_ports[int(target_port[1])]
+                else:
+                    print "Error: %d is not a known STARTTLS port number." % int(target_port[1])
+            else:
+                print "Error: Missing port number in STARTTLS auto mode."
         
         if self._starttls == 'smtp':
             server_test = SMTPServerTester(target)
@@ -179,7 +190,7 @@ class ServersConnectivityTester(ConnectivityTester):
             server_test = XMPPServerTester(target, self._xmpp_to)
         else:
             server_test = SSLServerTester(target)
-            
+
         return server_test.test_connectivity(timeout)
 
 
