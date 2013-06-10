@@ -25,7 +25,6 @@
 
 import os
 import re
-import imp
 import json
 from xml.etree.ElementTree import Element
 
