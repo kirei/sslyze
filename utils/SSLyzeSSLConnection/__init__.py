@@ -151,6 +151,20 @@ class SSLyzeSSLConnection:
                 xmpp_to = host
                 
             ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
+
+        # Remap to correct service based on port when starttls auto is used.
+        elif shared_settings['starttls'] == 'auto':
+            service = shared_settings['starttls_ports'][port]
+            if service == 'smtp':
+                ssl_connection = SMTPConnection(host, port, ssl, timeout)
+                    
+            elif service == 'xmpp':
+                if shared_settings['xmpp_to']:
+                    xmpp_to = shared_settings['xmpp_to']
+                else:
+                    xmpp_to = host
+                ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
+            
                  
         elif shared_settings['https_tunnel_host']:
             # Using an HTTP CONNECT proxy to tunnel SSL traffic
