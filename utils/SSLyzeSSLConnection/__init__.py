@@ -106,6 +106,8 @@ class SSLyzeSSLConnection:
     
         timeout = shared_settings['timeout']
         (host, _, port) = target
+        self.port = port
+        
         if hello_workaround:
             ssl_ctx.set_cipher_list(self.SSL_HELLO_WORKAROUND_CIPHERS)
         
@@ -243,6 +245,18 @@ class SSLyzeSSLConnection:
                 
         elif shared_settings['starttls'] == 'xmpp':
             result = ''
+
+        # Remap to correct service based on port when starttls auto is used.
+        elif shared_settings['starttls'] == 'auto':
+            service = shared_settings['starttls_ports'][self.port]
+            if service == 'smtp':
+                try:
+                    ssl_connection.sock.send('NOOP\r\n')
+                    result = ssl_connection.sock.read(2048).strip()
+                except socket.timeout:
+                    result = 'Timeout on SMTP NOOP'
+            elif service == 'xmpp':
+                result = ''
             
         elif shared_settings['http_get']:
             try: # Send an HTTP GET to the server and store the HTTP Status Code
