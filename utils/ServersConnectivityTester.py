@@ -72,8 +72,9 @@ class ProxyConnectivityTester(ConnectivityTester):
                          'proxy; discarding all tasks.')
     PROXY_OK_FORMAT = '\n   {0:<35}  => {1} - Proxy OK'
     
-    def __init__(self, target_list, proxy_str):
+    def __init__(self, shared_settings, target_list, proxy_str):
         
+        self._shared_settings = shared_settings
         self._target_list = target_list
         self._proxy_str = proxy_str
         self._result_str = ''
@@ -121,14 +122,15 @@ class ServersConnectivityTester(ConnectivityTester):
 
     TARGET_OK_FORMAT = '\n   {0:<35} => {1}'
 
-    def __init__(self, target_list, starttls=None, xmpp_to=None):
+    def __init__(self, shared_settings, target_list, starttls=None, xmpp_to=None):
         
+        self._shared_settings = shared_settings
         self._target_list = target_list
         self._starttls = starttls
         self._xmpp_to = xmpp_to
         self._targets_OK = []
         self._targets_ERR = []
-
+        
    
     def test_connectivity(self,  timeout):
         """
@@ -172,13 +174,14 @@ class ServersConnectivityTester(ConnectivityTester):
           
  
     def _test_server(self, target, timeout):
-        starttls_ports = {25:'smtp', 587:'smtp', 5222:'xmpp', 5269:'xmpp'}
+        self._starttls_ports = self._shared_settings['starttls_ports']
         target_port = target.split(':')
-        
+
+        # Rewrite the starttls parameter based on port if set to auto.
         if self._starttls == 'auto':
             if len(target_port) == 2:
-                if int(target_port[1]) in starttls_ports:
-                    self._starttls = starttls_ports[int(target_port[1])]
+                if int(target_port[1]) in self._starttls_ports:
+                    self._starttls = self._starttls_ports[int(target_port[1])]
                 else:
                     print "Error: %d is not a known STARTTLS port number." % int(target_port[1])
             else:
