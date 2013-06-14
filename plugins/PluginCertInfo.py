@@ -239,6 +239,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         fingerprint = cert.get_fingerprint()
         cmd_title = 'Certificate'
         txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
+
+        if self._shared_settings['sni']:
+            sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
+            txt_result.append(self.FIELD_FORMAT.format("SNI:", sni_text))
+        
         trust_txt = 'Certificate is Trusted' if is_cert_trusted \
                                              else 'Certificate is NOT Trusted'
 
@@ -271,6 +276,9 @@ class PluginCertInfo(PluginBase.PluginBase):
                           'hasMatchingHostname' : str(host_xml)}
         if untrusted_reason:
             trust_xml_attr['reasonWhyNotTrusted'] = untrusted_reason
+
+        if self._shared_settings['sni']:
+            trust_xml_attr['sni'] = self._shared_settings['sni']
             
         trust_xml = Element('certificate', attrib = trust_xml_attr)
         
