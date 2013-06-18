@@ -33,12 +33,21 @@ from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, constants, \
     X509_V_CODES, SSL_CTX
 from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 
+import urllib2
+import subprocess
+import hashlib
+import json
 
 # Import Mozilla trust store and EV OIDs
 DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
 MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
 MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
                                   os.path.join(DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
+
+# Defines for CRL parsing using OpenSSL crl command.
+CRL_CACHE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'crl')
+OPENSSL = "openssl"
+OPENSSL_CLR_CMD = " crl -noout -text -inform DER -in "
 
 
 class X509CertificateHelper:
@@ -206,6 +215,13 @@ class PluginCertInfo(PluginBase.PluginBase):
             "the certificate. CERTINFO should be 'basic' or 'full'.",
         dest="certinfo")
 
+    interface.add_command(
+        command="crl",
+        help= "Verifies the certificate ID against the CRL pointed to by the certificate. "
+            "CRL should be set to 'crl'.",
+        dest="crl")
+
+
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
@@ -227,6 +243,17 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Results formatting
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
+
+        if self._shared_settings['crl']:
+            self.crl_result = self._check_crl(cert_dict)
+            if self.crl_result['verified']:
+                print "Cert not in CRL."
+            else:
+                if 'uri_error' in self.crl_result:
+                    print "Problem loading CRL: %s" % self.crl_result['uri_error']
+                else:
+                    print "Cerificate revoked in CRL."
+
         
         # Text output
         if arg == 'basic':
@@ -315,6 +342,105 @@ class PluginCertInfo(PluginBase.PluginBase):
                 return 'Subject Alternative Name'       
         
         return False
+
+
+    def _check_crl(self, cert):
+        self.crl_result = {}
+        self.crl_result['verified'] = False
+
+        self.crl_uri = cert['extensions']['X509v3 CRL Distribution Points']['URI'][0]
+        self.cert_id = cert['serialNumber']
+        
+        self.filename_hash_prefix = hashlib.sha1(self.crl_uri).hexdigest()
+        self.crl_filename = self.filename_hash_prefix + ".crl"
+        self.db_filename = self.filename_hash_prefix + ".db"
+        self.all_crl_files = os.listdir(CRL_CACHE_DIR)
+    
+        # Check if we need to create DB with parsed CRL for the
+        # crl_uri before verifying the id.
+        if self.db_filename not in self.all_crl_files:
+            # Try to download the CRL file, save it and then
+            # parse the file to create the DB.
+            self.crl_der_data = None
+            self.target_handler = None
+            self.e = None
+            try:
+                self.target_handler = urllib2.urlopen(self.crl_uri)
+                self.crl_der_data = self.target_handler.read()
+                self.target_handler.close()
+            except urllib2.URLError, self.e:
+                # Return early if we couldn't download the CRL file.
+                self.crl_result['uri_error'] = str(self.e.code) + ' ' + self.e.reason
+                return self.crl_result
+
+            # Store the received CLR data in DER format as a file.
+            with open(CRL_CACHE_DIR + '/' + self.crl_filename, 'wb') as self.crl_file:
+                self.crl_file.write(self.crl_der_data)
+
+            # Extract crl data as formatted text using OpenSSL.
+            self.openssl_command = OPENSSL + OPENSSL_CLR_CMD +\
+                              CRL_CACHE_DIR + "/" + self.crl_filename
+            self.crl_text_data = subprocess.Popen(self.openssl_command, shell=True,
+                                                  stdout=subprocess.PIPE,
+                                                  stderr=subprocess.STDOUT).stdout.read()
+
+            # Create a DB with the IDs, revocation date and possible
+            # revocation reason for the extracted data.
+            self.crl_db = {}
+            self.crl_db['crl_name'] = self.crl_uri.split('/')[-1]
+            self.crl_data_lines = self.crl_text_data.split('\n')
+
+
+            # Parse and create records with ID, date and if present reason.
+            # Some hard coded parsing here.
+            self.cert_serial = ""
+            self.revocation_date = ""
+            self.revocation_reason = ""
+            self.new_record = False
+            self.reason_present = False
+            for self.line in self.crl_data_lines:
+                self.linestrip = self.line.strip()
+                
+                if "Serial Number:" in self.linestrip:
+                    # Close previous record before creating a new
+                    if self.new_record:
+                        self.crl_db[self.cert_serial] = (self.revocation_date, self.revocation_reason)
+                    self.cert_serial = self.linestrip.split(':')[-1].strip().lower()
+                    self.revocation_date = ""
+                    self.revocation_reason = ""
+                    self.new_record = True
+
+                if "Revocation Date:" in self.linestrip:
+                    self.revocation_date = self.linestrip[17:]
+            
+                if self.reason_present:
+                    self.revocation_reason = self.linestrip.split(':')[-1].strip()
+                    self.reason_present = False
+
+                if "X509v3 CRL Reason Code:" in self.linestrip:
+                    # The next row is assumed to contain the reason.
+                    self.reason_present = True
+            # Add final record
+            self.crl_db[self.cert_serial] = (self.revocation_date, self.revocation_reason)
+        
+            # Store the DB as a JSON blob.
+            self.crl_db_json = json.dumps(self.crl_db)
+            with open(CRL_CACHE_DIR + '/' + self.db_filename, 'wb') as self.db_file:
+                                        self.db_file.write(self.crl_db_json)
+
+        else:
+            # Load the database from the file.
+            with open(CRL_CACHE_DIR + '/' + self.db_filename, 'rb') as self.db_file:
+                self.crl_db_json = self.db_file.read()
+            self.crl_db = json.loads(self.crl_db_json)
+
+        # Finally check if the give ID is in the CRL.
+        if self.cert_id.lower() in self.crl_db:
+            self.crl_result[self.cert_id.lower()] = self.crl_db[cert_id.lower()]
+        else:
+            self.crl_result['verified'] = True
+
+        return self.crl_result
         
 
     def _is_ev_certificate(self, cert_dict):
