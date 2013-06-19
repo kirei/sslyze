@@ -217,9 +217,10 @@ class PluginCertInfo(PluginBase.PluginBase):
 
     interface.add_command(
         command="crl",
-        help= "Verifies the certificate ID against the CRL pointed to by the certificate. "
-            "CRL should be set to 'crl'.",
-        dest="crl")
+        help= "Verify that the certificate ID against the CRL pointed "
+             "to by the certificate is accessible and that the certificate "
+             "is not revoked.",
+        dest=None)
 
 
     FIELD_FORMAT = '      {0:<35}{1:<35}'
@@ -256,9 +257,9 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         
         # Text output
-        if arg == 'basic':
+        if self._shared_settings['certinfo'] == 'basic':
             cert_txt = self._get_basic_text(cert, cert_dict)
-        elif arg == 'full':
+        elif self._shared_settings['certinfo'] == 'full':
             cert_txt = [cert.as_text()]
         else:
             raise Exception("PluginCertInfo: Unknown command.")
