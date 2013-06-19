@@ -215,8 +215,8 @@ class PluginCertInfo(PluginBase.PluginBase):
             "the certificate. CERTINFO should be 'basic' or 'full'.",
         dest="certinfo")
 
-    interface.add_command(
-        command="crl",
+    interface.add_option(
+        option="crl",
         help= "Verify that the certificate ID against the CRL pointed "
              "to by the certificate is accessible and that the certificate "
              "is not revoked.",
@@ -313,6 +313,14 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         if self._shared_settings['sni']:
             trust_xml_attr['sni'] = self._shared_settings['sni']
+
+        if self._shared_settings['crl']:
+            if self.crl_result['verified']:
+                trust_xml_attr['crl'] = "verified"
+            elif 'uri_error' in self.crl_result:
+                trust_xml_attr['crl'] = self.crl_result['uri_error']
+            else:
+                trust_xml_attr['crl'] = "revoked"
             
         trust_xml = Element('certificate', attrib = trust_xml_attr)
         
