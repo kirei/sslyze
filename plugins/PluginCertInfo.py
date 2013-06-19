@@ -437,7 +437,7 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         # Finally check if the give ID is in the CRL.
         if self.cert_id.lower() in self.crl_db:
-            self.crl_result[self.cert_id.lower()] = self.crl_db[cert_id.lower()]
+            self.crl_result[self.cert_id.lower()] = self.crl_db[self.cert_id.lower()]
         else:
             self.crl_result['verified'] = True
 
