@@ -206,6 +206,12 @@ class PluginCertInfo(PluginBase.PluginBase):
             "the certificate. CERTINFO should be 'basic' or 'full'.",
         dest="certinfo")
 
+    interface.add_option(
+        option="ocsp",
+        help= "Verify the certificate against the OCSP responder the "
+              "certificate points to.",
+        dest=None)
+
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
