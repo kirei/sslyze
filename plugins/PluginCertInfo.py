@@ -245,28 +245,34 @@ class PluginCertInfo(PluginBase.PluginBase):
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
 
+        # Perform CRL checking if the option has been selected.
         if self._shared_settings['crl']:
             self.crl_result = self._check_crl(cert_dict)
-            if self.crl_result['verified']:
-                print "Cert not in CRL."
-            else:
-                if 'uri_error' in self.crl_result:
-                    print "Problem loading CRL: %s" % self.crl_result['uri_error']
-                else:
-                    print "Cerificate revoked in CRL."
-
         
         # Text output
+        cert_txt = []
         if self._shared_settings['certinfo'] == 'basic':
             cert_txt = self._get_basic_text(cert, cert_dict)
         elif self._shared_settings['certinfo'] == 'full':
             cert_txt = [cert.as_text()]
         else:
-            raise Exception("PluginCertInfo: Unknown command.")
+            pass
             
         fingerprint = cert.get_fingerprint()
         cmd_title = 'Certificate'
         txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
+
+        # Create text result for any CRL checks done.
+        if self._shared_settings['crl']:
+            if self.crl_result['verified']:
+                crl_result_text = "Certificate not revoked in CRL."
+            elif 'uri_error' in self.crl_result:
+                crl_result_text = "Problem loading CRL. " + self.crl_result['uri_error']
+            else:
+                crl_result_text = "Cerificate revoked in CRL at %s. %s" % \
+                                  (self.crl_result['revocation'][0], self.crl_result['revocation'][1])
+            txt_result.append(self.FIELD_FORMAT.format("CRL verification:", crl_result_text))
+
 
         if self._shared_settings['sni']:
             sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
@@ -437,7 +443,7 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         # Finally check if the give ID is in the CRL.
         if self.cert_id.lower() in self.crl_db:
-            self.crl_result[self.cert_id.lower()] = self.crl_db[self.cert_id.lower()]
+            self.crl_result['revocation'] = self.crl_db[self.cert_id.lower()]
         else:
             self.crl_result['verified'] = True
 
