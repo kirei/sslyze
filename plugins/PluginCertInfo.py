@@ -265,7 +265,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Create text result for any CRL checks done.
         if self._shared_settings['crl']:
             if self.crl_result['verified']:
-                crl_result_text = "Certificate not revoked in CRL."
+                crl_result_text = "Certificate not revoked in CRL"
             elif 'uri_error' in self.crl_result:
                 crl_result_text = "Problem loading CRL. " + self.crl_result['uri_error']
             else:
