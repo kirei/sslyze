@@ -369,11 +369,18 @@ class PluginCertInfo(PluginBase.PluginBase):
         self.filename_hash_prefix = hashlib.sha1(self.crl_uri).hexdigest()
         self.crl_filename = self.filename_hash_prefix + ".crl"
         self.db_filename = self.filename_hash_prefix + ".db"
+        self.err_filename = self.filename_hash_prefix + ".err"
         self.all_crl_files = os.listdir(CRL_CACHE_DIR)
     
-        # Check if we need to create DB with parsed CRL for the
-        # crl_uri before verifying the id.
-        if self.db_filename not in self.all_crl_files:
+        # Check if we have previously failed at retrieving the CRL or if we need to
+        # create DB with parsed CRL for the crl_uri before verifying the id.
+        if self.err_filename in self.all_crl_files:
+            # Load the err file and return the contents as reason.
+            with open(CRL_CACHE_DIR + '/' + self.err_filename, 'rb') as self.err_file:
+                self.crl_result['uri_error'] = self.err_file.read()
+                return self.crl_result
+            
+        elif self.db_filename not in self.all_crl_files:
             # Try to download the CRL file, save it and then
             # parse the file to create the DB.
             self.crl_der_data = None
@@ -385,6 +392,9 @@ class PluginCertInfo(PluginBase.PluginBase):
                 self.target_handler.close()
             except urllib2.URLError, self.e:
                 # Return early if we couldn't download the CRL file.
+                # But first we write HTTP error code and reason to an err file.
+                with open(CRL_CACHE_DIR + '/' + self.err_filename, 'wb') as self.err_file:
+                    self.err_file.write(str(self.e.code) + ' ' + self.e.reason)
                 self.crl_result['uri_error'] = str(self.e.code) + ' ' + self.e.reason
                 return self.crl_result
 
