@@ -33,6 +33,13 @@ from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, constants, \
     X509_V_CODES, SSL_CTX
 from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 
+import os
+import urllib2
+import subprocess
+import hashlib
+
+OPENSSL = "openssl"
+OCSP_CACHE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'ocsp')
 
 # Import Mozilla trust store and EV OIDs
 DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
@@ -233,6 +240,10 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Results formatting
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
+
+        # Perform CRL checking if the option has been selected.
+        if self._shared_settings['ocsp']:
+            self.ocsp_result = self._check_ocsp(cert_dict)            
         
         # Text output
         if arg == 'basic':
@@ -247,6 +258,17 @@ class PluginCertInfo(PluginBase.PluginBase):
         txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
         trust_txt = 'Certificate is Trusted' if is_cert_trusted \
                                              else 'Certificate is NOT Trusted'
+
+        if self._shared_settings['ocsp']:
+            if self.ocsp_result['verified']:
+                ocsp_result_text = "Certificate verified by OCSP"
+            elif 'uri_error' in self.ocsp_result:
+                ocsp_result_text = "Problem loading OCSP Issuer CA. " + self.ocsp_result['uri_error']
+            else:
+                ocsp_result_text = "Cerificate not verified by OCSP %s " % \
+                                  self.ocsp_result['response'][0]
+            txt_result.append(self.FIELD_FORMAT.format("OCSP verification:", ocsp_result_text))
+
 
         is_ev = self._is_ev_certificate(cert_dict)
         if is_ev:
@@ -277,6 +299,14 @@ class PluginCertInfo(PluginBase.PluginBase):
                           'hasMatchingHostname' : str(host_xml)}
         if untrusted_reason:
             trust_xml_attr['reasonWhyNotTrusted'] = untrusted_reason
+
+        if self._shared_settings['ocsp']:
+            if self.ocsp_result['verified']:
+                trust_xml_attr['ocsp'] = "verified"
+            elif 'uri_error' in self.ocsp_result:
+                trust_xml_attr['ocsp'] = self.ocsp_result['uri_error']
+            else:
+                trust_xml_attr['ocsp'] = "ocsp"
             
         trust_xml = Element('certificate', attrib = trust_xml_attr)
         
@@ -294,6 +324,8 @@ class PluginCertInfo(PluginBase.PluginBase):
 
 
 # FORMATTING FUNCTIONS
+
+
 
     def _is_hostname_valid(self, cert_dict, target):
         (host, ip, port) = target
@@ -313,6 +345,63 @@ class PluginCertInfo(PluginBase.PluginBase):
                 return 'Subject Alternative Name'       
         
         return False
+
+        
+    def _check_ocsp(self, cert):
+        self.ca_issuer = cert['extensions']['Authority Information Access']['CAIssuers']['URI'][0]
+        self.ocsp_responder = cert['extensions']['Authority Information Access']['OCSP']['URI'][0]
+        self.cert_id = cert['serialNumber']
+        self.ocsp_filename_hash_prefix = hashlib.sha1(self.ca_issuer).hexdigest()
+        self.ocsp_crt_filename = self.ocsp_filename_hash_prefix + ".crt"
+        self.ocsp_pem_filename = self.ocsp_filename_hash_prefix + ".pem"
+        self.ocsp_err_filename = self.ocsp_filename_hash_prefix + ".err"
+        self.all_ocsp_files = os.listdir(OCSP_CACHE_DIR)
+        self.ocsp_result = {}
+        self.ocsp_result['verified'] = False
+
+        if self.ocsp_err_filename in self.all_ocsp_files:
+            with open(OCSP_CACHE_DIR + '/' + self.ocsp_err_filename, 'rb') as self.ocsp_err_file:
+                self.ocsp_result['uri_error'] = self.ocsp_err_file.read()
+                return self.ocsp_result
+
+        elif self.ocsp_pem_filename not in self.all_ocsp_files:
+            self.ocsp_der_data = None
+            self.ocsp_target_handler = None
+            self.ocsp_e = None
+            try:
+                self.ocsp_target_handler = urllib2.urlopen(self.ca_issuer)
+                self.ocsp_der_data = self.ocsp_target_handler.read()
+                self.ocsp_target_handler.close()
+            except urllib2.URLError, self.ocsp_e:
+                with open(OCSP_CACHE_DIR + '/' + self.ocsp_err_filename, 'wb') as self.ocsp_err_file:
+                    self.ocsp_err_file.write(str(self.ocsp_e.code) + ' ' + self.ocsp_e.reason)
+                self.ocsp_result['uri_error'] = str(self.ocsp_e.code) + ' ' + self.ocsp_e.reason
+                return self.ocsp_result
+
+            with open(OCSP_CACHE_DIR + '/' + self.ocsp_crt_filename, 'wb') as self.ocsp_crt_file:
+                self.ocsp_crt_file.write(self.ocsp_der_data)
+
+            self.openssl_der_pem_cmd = OPENSSL + " x509" + " -inform DER" + " -in " + \
+                                       OCSP_CACHE_DIR + "/" + self.ocsp_crt_filename +\
+                                       " -outform PEM" + " -out " +\
+                                       OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename
+            subprocess.Popen(self.openssl_der_pem_cmd, shell=True,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT).stdout.read()
+            
+        self.openssl_ocsp_cmd = OPENSSL + " ocsp" + " -issuer " +\
+                                       OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename +\
+                                       " -serial " + "0x" + self.cert_id +\
+                                       " -url " + self.ocsp_responder +\
+                                       " -noverify -no_nonce"
+        self.ocsp_text_data = subprocess.Popen(self.openssl_ocsp_cmd, shell=True,
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT).stdout.read()
+
+        self.ocsp_result['response'] = self.ocsp_text_data.split('\n')
+        if "good" in self.ocsp_text_data:
+            self.ocsp_result['verified'] = True
+        return self.ocsp_result
         
 
     def _is_ev_certificate(self, cert_dict):
