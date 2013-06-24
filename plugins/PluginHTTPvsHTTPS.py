@@ -31,10 +31,10 @@
 #   along with SSLyze.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
 
+from plugins import PluginBase
 from xml.etree.ElementTree import Element
 import httplib
-from plugins import PluginBase
-
+import ssl
 
 class PluginHTTPvsHTTPS(PluginBase.PluginBase):
 
@@ -49,43 +49,52 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
 
         output_format = '        {0:<25} {1}'
 
-        hsts_supported = False
-        hsts_timeout = ""
         (host, addr, port) = target
-        connection = httplib.HTTPSConnection(host)
-        try:
-            connection.connect()
-            connection.request("HEAD", "/", headers={"Connection": "close"})
-            response = connection.getresponse()
-            headers = response.getheaders()
-            for (field, data) in headers:
-                if field == 'strict-transport-security':
-                    hsts_supported = True
-                    hsts_timeout = data
 
-        except httplib.HTTPException as ex:
-            print "Error: %s" % ex
+        self.http_error = None
+        self.https_error = None
+
+        print "Trying to connect using HTTP..."
+        self.http_connection = httplib.HTTPConnection(host, 80)
+        try:
+            self.http_connection.connect()
+            self.http_connection.request("HEAD", "/", headers={"Connection": "close"})
+            self.http_response = self.http_connection.getresponse()
+            self.http_headers = self.http_response.getheaders()
+        except httplib.HTTPException as self.http_error:
+            pass
+            # print "HTTPS Error: %s" % self.http_error
 
         finally:
-            connection.close()
+            self.http_connection.close()
 
-        # Text output
-        cmd_title = 'HTTPvsHTTPS'
-        txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
-        if hsts_supported:
-            txt_result.append(output_format.format("Supported:", hsts_timeout))
+        print "Trying to connect using HTTPS..."
+        self.https_connection = httplib.HTTPSConnection(host, 443)
+        try:
+            self.https_connection.connect()
+            self.https_connection.request("HEAD", "/", headers={"Connection": "close"})
+            self.https_response = self.https_connection.getresponse()
+            self.https_headers = self.https_response.getheaders()
+        except ssl.SSLError as self.https_error:
+            pass
+            # print "HTTPS Error: %s" % self.https_error
+
+        finally:
+            self.https_connection.close()
+
+        # Save the generated rule to the local rules dir.
+        if not self.http_error:
+            print "http ok"
+            print self.http_headers
         else:
-            txt_result.append(output_format.format("Not supported.", ""))
-
-        # XML output
-        xml_hsts_attr = {'hsts_header_found': str(hsts_supported)}
-        if hsts_supported:
-            xml_hsts_attr['hsts_header'] = hsts_timeout
-        xml_hsts = Element('hsts', attrib = xml_hsts_attr)
-
-        xml_result = Element(self.__class__.__name__, command = command,
-                             title = cmd_title)
-        xml_result.append(xml_hsts)
-
-        return PluginBase.PluginResult(txt_result, xml_result)
+            print "http failed"
+            
+        if not self.https_error:
+            print "https ok"
+            print self.https_headers
+        else:
+            print "https failed."
+            
+        
+        return PluginBase.PluginResult([], [])
 
