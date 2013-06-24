@@ -241,7 +241,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
 
-        # Perform CRL checking if the option has been selected.
+        # Perform OCSP checking if the option has been selected.
         if self._shared_settings['ocsp']:
             self.ocsp_result = self._check_ocsp(cert_dict)            
         
