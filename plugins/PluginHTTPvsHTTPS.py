@@ -35,6 +35,9 @@ from plugins import PluginBase
 from xml.etree.ElementTree import Element
 import httplib
 import ssl
+import os
+
+RULE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'rules')
 
 class PluginHTTPvsHTTPS(PluginBase.PluginBase):
 
@@ -54,7 +57,6 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
         self.http_error = None
         self.https_error = None
 
-        print "Trying to connect using HTTP..."
         self.http_connection = httplib.HTTPConnection(host, 80)
         try:
             self.http_connection.connect()
@@ -63,12 +65,9 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
             self.http_headers = self.http_response.getheaders()
         except httplib.HTTPException as self.http_error:
             pass
-            # print "HTTPS Error: %s" % self.http_error
-
         finally:
             self.http_connection.close()
 
-        print "Trying to connect using HTTPS..."
         self.https_connection = httplib.HTTPSConnection(host, 443)
         try:
             self.https_connection.connect()
@@ -77,24 +76,38 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
             self.https_headers = self.https_response.getheaders()
         except ssl.SSLError as self.https_error:
             pass
-            # print "HTTPS Error: %s" % self.https_error
-
         finally:
             self.https_connection.close()
 
-        # Save the generated rule to the local rules dir.
-        if not self.http_error:
-            print "http ok"
-            print self.http_headers
+        # If we could connect to the host using both
+        # http and https we generate a rule for the host.
+        if not self.http_error and not self.https_error:
+            self.rule_filename = RULE_DIR + '/' + host + '.xml'
+            with open(self.rule_filename, 'wb') as self.rule_file:
+                self.rule_file.write('<ruleset name="' + host + '">' + '\n')
+                self.rule_file.write('  <target host="' + host + '" />' +  '\n')
+                self.rule_file.write('  <target host="' + 'www.' + host + '" />' +  '\n')
+                self.rule_file.write('  <rule from="^http://(www\.)?' + host +\
+                                     '/"' + ' to="https://' + 'www.' + host + '" />' + '\n')
+                self.rule_file.write('<ruleset>' + '\n')
+
+
+        # Generate diagnostic info in text and XML format.
+        cmd_title = 'HTTP vs HTTPS'
+        self.txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
+        if not self.http_error and not self.https_error:
+            self.txt_result.append(output_format.format("HTTP and HTTPS supported.", ""))
         else:
-            print "http failed"
-            
-        if not self.https_error:
-            print "https ok"
-            print self.https_headers
-        else:
-            print "https failed."
-            
+            if self.http_error:
+                self.txt_result.append(output_format.format("HTTP not supported.", ""))
+            if self.https_error:
+                self.txt_result.append(output_format.format("HTTPS not supported.", ""))
+
+        self.xml_attr = {'http': str(not self.http_error), 'https': str(not self.https_error)}
+        self.xml_http_vs_https = Element('http_vs_https', attrib = self.xml_attr)
+        self.xml_result = Element(self.__class__.__name__, command = command,
+                             title = cmd_title)
+        self.xml_result.append(self.xml_http_vs_https)
         
-        return PluginBase.PluginResult([], [])
+        return PluginBase.PluginResult(self.txt_result, self.xml_result)
 
