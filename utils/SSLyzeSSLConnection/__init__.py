@@ -166,7 +166,8 @@ class SSLyzeSSLConnection:
                 else:
                     xmpp_to = host
                 ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
-            
+            else:
+                ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
                  
         elif shared_settings['https_tunnel_host']:
             # Using an HTTP CONNECT proxy to tunnel SSL traffic

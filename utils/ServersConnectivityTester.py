@@ -182,10 +182,6 @@ class ServersConnectivityTester(ConnectivityTester):
             if len(target_port) == 2:
                 if int(target_port[1]) in self._starttls_ports:
                     self._starttls = self._starttls_ports[int(target_port[1])]
-                else:
-                    print "Error: %d is not a known STARTTLS port number." % int(target_port[1])
-            else:
-                print "Error: Missing port number in STARTTLS auto mode."
         
         if self._starttls == 'smtp':
             server_test = SMTPServerTester(target)
