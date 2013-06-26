@@ -383,31 +383,36 @@ class PluginCertInfo(PluginBase.PluginBase):
     def _get_cert(self, target):
         """
         Connects to the target server and returns the server's certificate
+        Also performs verification against Trust Stores. One SSL context
+        for each Trust Store.
         """
-        verify_result = None
-        ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
+        verify_result = {}
         for ca_file in ca_files_to_load:
+            ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
             ssl_ctx.load_verify_locations(ca_file)
-        ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
-        ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
+            
+            ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
+            ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
                                           hello_workaround=True)
 
-        if self._shared_settings['verbosity'] > 2:
-            print "Shared settings:"
-            print self._shared_settings
+            if self._shared_settings['verbosity'] > 2:
+                print "Shared settings:"
+                print self._shared_settings
 
-        try: # Perform the SSL handshake
-            ssl_connect.connect()
-            cert = ssl_connect._ssl.get_peer_certificate()
-            verify_result = ssl_connect._ssl.get_verify_result()
+            try: # Perform the SSL handshake
+                ssl_connect.connect()
+                cert = ssl_connect._ssl.get_peer_certificate()
+                tmp_verify_result = ssl_connect._ssl.get_verify_result()
             
-        except ClientCertificateError: # The server asked for a client cert
-            # We can get the server cert anyway
-            cert = ssl_connect._ssl.get_peer_certificate()
-            verify_result = ssl_connect._ssl.get_verify_result()            
+            except ClientCertificateError: # The server asked for a client cert
+                # We can get the server cert anyway
+                cert = ssl_connect._ssl.get_peer_certificate()
+                tmp_verify_result = ssl_connect._ssl.get_verify_result()            
             
-        finally:
-            ssl_connect.close()
+            finally:
+                ssl_connect.close()
+
+            verify_result[ca_file] = tmp_verify_result
 
         return (cert, verify_result)
 
