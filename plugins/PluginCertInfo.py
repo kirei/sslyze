@@ -388,6 +388,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         """
         verify_result = {}
         for ca_file in ca_files_to_load:
+            ca_name = ca_file.split('/')[-1]
             ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
             ssl_ctx.load_verify_locations(ca_file)
             
@@ -412,7 +413,7 @@ class PluginCertInfo(PluginBase.PluginBase):
             finally:
                 ssl_connect.close()
 
-            verify_result[ca_file] = tmp_verify_result
+            verify_result[ca_name] = tmp_verify_result
 
         return (cert, verify_result)
 
