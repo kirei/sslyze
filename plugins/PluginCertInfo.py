@@ -237,10 +237,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Figure out if/why the verification failed
         untrusted_reason = None
         is_cert_trusted = True
-        if verify_result != 0:
-            is_cert_trusted = False
-            untrusted_reason = X509_V_CODES.X509_V_CODES[verify_result]
-         
+        for ca_name in verify_result:
+            if verify_result[ca_name] != 'ok':
+                is_cert_trusted = False
+                untrusted_reason = ca_name + ' - ' + verify_result[ca_name]
+        
         # Results formatting
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
@@ -256,22 +257,28 @@ class PluginCertInfo(PluginBase.PluginBase):
         fingerprint = cert.get_fingerprint()
         cmd_title = 'Certificate'
         txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
-        trust_txt = 'Certificate is Trusted' if is_cert_trusted \
-                                             else 'Certificate is NOT Trusted'
+
+        if is_cert_trusted:
+            txt_result.append(self.FIELD_FORMAT.format("Trusted or NOT Trusted:", "Trusted"))
+        else:
+            txt_result.append(self.FIELD_FORMAT.format("Trusted or NOT Trusted:", "NOT Trusted"))
+
+        for ca_name in verify_result:
+            if verify_result[ca_name] == 'ok':
+                txt_result.append(self.FIELD_FORMAT.format("Validated by Trust Store: ", ca_name))
+            else:
+                txt_result.append(self.FIELD_FORMAT.format("Not validated by Trust Store: ",
+                                                           ca_name + ' - ' + verify_result[ca_name]))
 
         ev_result = self._is_ev_certificate(cert_dict)
-        is_ev = False
+        is_ev = True
         for ev in ev_result:
             if ev_result[ev]:
-                is_ev = True
-                trust_txt = trust_txt + ' - Extended Validation with %s' % ev
+                txt_result.append(self.FIELD_FORMAT.format("Extended Validation with:", ev))
             else:
-                trust_txt = trust_txt + ' - Not Extended Validation with %s' % ev
-                
-        if untrusted_reason:
-            trust_txt = trust_txt + ': ' + untrusted_reason
+                is_ev = False
+                txt_result.append(self.FIELD_FORMAT.format("NOT Extended Validation with:", ev))
 
-        txt_result.append(self.FIELD_FORMAT.format("Validation w/ Mozilla's CA Store:", trust_txt))
         
         is_host_valid = self._is_hostname_valid(cert_dict, target)
         host_txt = 'OK - ' + is_host_valid + ' Matches' if is_host_valid \
@@ -287,7 +294,7 @@ class PluginCertInfo(PluginBase.PluginBase):
                         else False
             
         xml_result = Element(command, argument = arg, title = cmd_title)
-        trust_xml_attr = {'isTrustedByMozillaCAStore' : str(is_cert_trusted),
+        trust_xml_attr = {'isTrustedByAllCAStores' : str(is_cert_trusted),
                           'sha1Fingerprint' : fingerprint,
                           'isExtendedValidation' : str(is_ev),
                           'hasMatchingHostname' : str(host_xml)}
@@ -388,7 +395,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         """
         verify_result = {}
         for ca_file in ca_files_to_load:
-            ca_name = ca_file.split('/')[-1]
+            ca_name = (ca_file.split('/')[-1]).split('.')[0]
             ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
             ssl_ctx.load_verify_locations(ca_file)
             
@@ -413,7 +420,7 @@ class PluginCertInfo(PluginBase.PluginBase):
             finally:
                 ssl_connect.close()
 
-            verify_result[ca_name] = tmp_verify_result
+            verify_result[ca_name] = X509_V_CODES.X509_V_CODES[tmp_verify_result]
 
         return (cert, verify_result)
 
