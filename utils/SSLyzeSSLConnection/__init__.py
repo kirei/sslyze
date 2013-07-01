@@ -167,8 +167,16 @@ class SSLyzeSSLConnection:
                     xmpp_to = host
                 ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
             else:
-                ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
-                 
+                if shared_settings['https_tunnel_host']:
+                    # Using an HTTP CONNECT proxy to tunnel SSL traffic
+                    tunnel_host = shared_settings['https_tunnel_host']
+                    tunnel_port = shared_settings['https_tunnel_port']
+                    ssl_connection = HTTPSConnection(tunnel_host, tunnel_port, ssl,  
+                                                     timeout=timeout)
+                    ssl_connection.set_tunnel(host, port)
+                else:
+                    ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
+                    
         elif shared_settings['https_tunnel_host']:
             # Using an HTTP CONNECT proxy to tunnel SSL traffic
             tunnel_host = shared_settings['https_tunnel_host']
@@ -178,7 +186,7 @@ class SSLyzeSSLConnection:
             ssl_connection.set_tunnel(host, port)
         else:
             ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
-            
+                
         
         # All done
         self._ssl_connection = ssl_connection
@@ -258,7 +266,31 @@ class SSLyzeSSLConnection:
                     result = 'Timeout on SMTP NOOP'
             elif service == 'xmpp':
                 result = ''
-            
+            else:
+                # Normal https while in auto mode.
+                if shared_settings['http_get']:
+                    try: # Send an HTTP GET to the server and store the HTTP Status Code
+                        ssl_connection.request("GET", "/", headers={"Connection": "close"})
+                        http_response = ssl_connection.getresponse()
+                        if http_response.version == 9 :
+                            # HTTP 0.9 => Probably not an HTTP response
+                            result = 'Server response was not HTTP'
+                        else:    
+                            result = 'HTTP ' + str(http_response.status) + ' ' \
+                                     + str(http_response.reason)
+                            if http_response.status >= 300 and http_response.status < 400:
+                                # Add redirection URL to the result
+                                redirect = http_response.getheader('Location', None)
+                                if redirect:
+                                    result = result + ' - ' + redirect
+                            
+                    except socket.timeout:
+                        result = 'Timeout on HTTP GET'
+                
+                else:
+                    result = ''
+
+                
         elif shared_settings['http_get']:
             try: # Send an HTTP GET to the server and store the HTTP Status Code
                 ssl_connection.request("GET", "/", headers={"Connection": "close"})
