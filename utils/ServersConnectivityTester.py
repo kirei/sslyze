@@ -181,8 +181,16 @@ class ServersConnectivityTester(ConnectivityTester):
         if self._starttls == 'auto':
             if len(target_port) == 2:
                 if int(target_port[1]) in self._starttls_ports:
-                    self._starttls = self._starttls_ports[int(target_port[1])]
-        
+                    service = self._starttls_ports[int(target_port[1])]
+                    if service == 'smtp':
+                        server_test = SMTPServerTester(target)
+                    elif service == 'xmpp':
+                        server_test = XMPPServerTester(target, self._xmpp_to)
+                    else:
+                        server_test = SSLServerTester(target)
+            else:
+                server_test = SSLServerTester(target)
+                
         if self._starttls == 'smtp':
             server_test = SMTPServerTester(target)
         elif self._starttls == 'xmpp':
