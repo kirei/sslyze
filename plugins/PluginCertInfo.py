@@ -53,7 +53,7 @@ for filename in ev_files_to_load:
     with open(os.path.join(load_data_path, filename)) as json_file:
         json_data = json.load(json_file)
     EV_DB[name[0]] = json_data
-
+    
 
 class X509CertificateHelper:
     # TODO: Move this somewhere else
@@ -330,7 +330,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         if _dnsname_to_pat(commonName).match(host):
             return 'Common Name'
         
-        try: # No luch, let's look at Subject Alternative Names
+        try: # No luck, let's look at Subject Alternative Names
             alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
         except KeyError:
             return False
@@ -344,19 +344,22 @@ class PluginCertInfo(PluginBase.PluginBase):
     
     def _is_ev_certificate(self, cert_dict):
         ev_result = {}
+        
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
-
-            loaded_ev = EV_DB.keys()
-            for ev_name in loaded_ev:
+            
+            for ev_name in EV_DB:
                 ev_match = False
                 ev_result[ev_name] = ev_match
-                ev_db_list = EV_DB[ev_name]
-                for db in ev_db_list:
-                    if policy[0] == db['oid']:
+                tmp_ev_db = EV_DB[ev_name]
+                for db in tmp_ev_db:
+                    tmp_db = tmp_ev_db[db]
+                    if policy[0] == tmp_db['oid']:
                         if self._shared_settings['verbosity'] > 1:
-                            print "Matched OID: %s" % policy[0]
-                            print "Fingerprint: %s" % db['fingerprint']
+                            print "Matched OID: %s" % tmp_db['oid']
+                            print "Fingerprint: %s" % tmp_db['fingerprint']
+                            print "Info: %s" % tmp_db['info']
+                            print
                         ev_match = True
                 ev_result[ev_name] = ev_match
                 
