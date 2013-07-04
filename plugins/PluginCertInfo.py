@@ -221,12 +221,6 @@ class PluginCertInfo(PluginBase.PluginBase):
             "the certificate. CERTINFO should be 'basic' or 'full'.",
         dest="certinfo")
 
-    interface.add_option(
-        option="oid",
-        help= "Perform a more comprehensive OID verification as part of "
-             "EV validation.",
-        dest=None)
-
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
