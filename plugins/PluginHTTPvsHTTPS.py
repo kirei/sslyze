@@ -92,7 +92,7 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
                     self.rule_file.write('  <rule from="^http://(www\.)?' + host +\
                                          '/"' + ' to="https://' + 'www.' + host + '" />\n')
                 else:
-                    self.rule_file.write('  <rule from="^http://?' + host +\
+                    self.rule_file.write('  <rule from="^http://' + host +\
                                          '/"' + ' to="https://' + host + '" />\n')
                 self.rule_file.write('</ruleset>\n')
 
