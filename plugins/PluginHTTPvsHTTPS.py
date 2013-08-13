@@ -101,7 +101,7 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
         cmd_title = 'HTTP vs HTTPS'
         self.txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
         if not self.http_error and not self.https_error:
-            self.txt_result.append(output_format.format("HTTP and HTTPS supported.", ""))
+            self.txt_result.append(output_format.format("Both HTTP and HTTPS supported.", ""))
         else:
             if self.http_error:
                 self.txt_result.append(output_format.format("HTTP not supported.", ""))
