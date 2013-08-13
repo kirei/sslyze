@@ -106,6 +106,8 @@ class SSLyzeSSLConnection:
     
         timeout = shared_settings['timeout']
         (host, _, port) = target
+        self.port = port
+        
         if hello_workaround:
             ssl_ctx.set_cipher_list(self.SSL_HELLO_WORKAROUND_CIPHERS)
         
@@ -151,7 +153,30 @@ class SSLyzeSSLConnection:
                 xmpp_to = host
                 
             ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
-                 
+
+        # Remap to correct service based on port when starttls auto is used.
+        elif shared_settings['starttls'] == 'auto':
+            service = shared_settings['starttls_ports'][port]
+            if service == 'smtp':
+                ssl_connection = SMTPConnection(host, port, ssl, timeout)
+                    
+            elif service == 'xmpp':
+                if shared_settings['xmpp_to']:
+                    xmpp_to = shared_settings['xmpp_to']
+                else:
+                    xmpp_to = host
+                ssl_connection = XMPPConnection(host, port, ssl, timeout, xmpp_to)   
+            else:
+                if shared_settings['https_tunnel_host']:
+                    # Using an HTTP CONNECT proxy to tunnel SSL traffic
+                    tunnel_host = shared_settings['https_tunnel_host']
+                    tunnel_port = shared_settings['https_tunnel_port']
+                    ssl_connection = HTTPSConnection(tunnel_host, tunnel_port, ssl,  
+                                                     timeout=timeout)
+                    ssl_connection.set_tunnel(host, port)
+                else:
+                    ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
+                    
         elif shared_settings['https_tunnel_host']:
             # Using an HTTP CONNECT proxy to tunnel SSL traffic
             tunnel_host = shared_settings['https_tunnel_host']
@@ -161,7 +186,7 @@ class SSLyzeSSLConnection:
             ssl_connection.set_tunnel(host, port)
         else:
             ssl_connection = HTTPSConnection(host, port, ssl, timeout=timeout)
-            
+                
         
         # All done
         self._ssl_connection = ssl_connection
@@ -229,7 +254,43 @@ class SSLyzeSSLConnection:
                 
         elif shared_settings['starttls'] == 'xmpp':
             result = ''
-            
+
+        # Remap to correct service based on port when starttls auto is used.
+        elif shared_settings['starttls'] == 'auto':
+            service = shared_settings['starttls_ports'][self.port]
+            if service == 'smtp':
+                try:
+                    ssl_connection.sock.send('NOOP\r\n')
+                    result = ssl_connection.sock.read(2048).strip()
+                except socket.timeout:
+                    result = 'Timeout on SMTP NOOP'
+            elif service == 'xmpp':
+                result = ''
+            else:
+                # Normal https while in auto mode.
+                if shared_settings['http_get']:
+                    try: # Send an HTTP GET to the server and store the HTTP Status Code
+                        ssl_connection.request("GET", "/", headers={"Connection": "close"})
+                        http_response = ssl_connection.getresponse()
+                        if http_response.version == 9 :
+                            # HTTP 0.9 => Probably not an HTTP response
+                            result = 'Server response was not HTTP'
+                        else:    
+                            result = 'HTTP ' + str(http_response.status) + ' ' \
+                                     + str(http_response.reason)
+                            if http_response.status >= 300 and http_response.status < 400:
+                                # Add redirection URL to the result
+                                redirect = http_response.getheader('Location', None)
+                                if redirect:
+                                    result = result + ' - ' + redirect
+                            
+                    except socket.timeout:
+                        result = 'Timeout on HTTP GET'
+                
+                else:
+                    result = ''
+
+                
         elif shared_settings['http_get']:
             try: # Send an HTTP GET to the server and store the HTTP Status Code
                 ssl_connection.request("GET", "/", headers={"Connection": "close"})

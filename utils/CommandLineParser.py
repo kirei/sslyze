@@ -180,7 +180,9 @@ class CommandLineParser():
             help= (
                 'Identifies the target server(s) as a SMTP or an XMPP server(s) '
                 'and scans the server(s) using STARTTLS. '
-                'STARTTLS should be \'smtp\' or \'xmpp\'.'),
+                'STARTTLS should be \'smtp\' or \'xmpp\'. '
+                'Alternatively \'auto\' can be given and the protocol will be '
+                'selected based on the given port number.'),
             dest='starttls',
             default=None)
     
@@ -278,9 +280,9 @@ class CommandLineParser():
             shared_settings['https_tunnel_port'] = None
             
         # STARTTLS
-        if args_command_list.starttls not in [None,'smtp','xmpp']:
+        if args_command_list.starttls not in [None,'auto','smtp','xmpp']:
             raise CommandLineParsingError(
-                '--starttls should be \'smtp\' or \'xmpp\'.')
+                '--starttls should be \'smtp\', \'xmpp\' or \'auto\'.')
         
         if args_command_list.starttls and args_command_list.https_tunnel:
             raise CommandLineParsingError(

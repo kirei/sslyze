@@ -35,6 +35,7 @@ SSLYZE_VERSION = 'SSLyze v0.7 beta'
 DEFAULT_NB_PROCESSES = 5
 DEFAULT_TIMEOUT =   5
 PROJECT_URL = "https://github.com/isecPartners/sslyze"
+STARTTLS_PORTS = {25:'smtp', 443:'https', 587:'smtp', 5222:'xmpp', 5269:'xmpp'}
 
 # Todo: Move formatting stuff to another file
 SCAN_FORMAT = 'Scan Results For {0}:{1} - {2}:{1}'
@@ -141,7 +142,9 @@ def main():
     except CommandLineParsingError as e:
         print e.get_error_msg()
         return
-    
+
+
+    shared_settings['starttls_ports'] = STARTTLS_PORTS
 
     #--PROCESSES INITIALIZATION--
     if command_list.https_tunnel:
@@ -164,10 +167,10 @@ def main():
     print _format_title('Checking host(s) availability')
 
     if command_list.https_tunnel:
-        targets_tester = ProxyConnectivityTester(target_list, 
+        targets_tester = ProxyConnectivityTester(shared_settings, target_list, 
                                                  command_list.https_tunnel)
     else:
-        targets_tester = ServersConnectivityTester(target_list, 
+        targets_tester = ServersConnectivityTester(shared_settings, target_list, 
                                                    command_list.starttls,
                                                    command_list.xmpp_to)
 

@@ -72,8 +72,9 @@ class ProxyConnectivityTester(ConnectivityTester):
                          'proxy; discarding all tasks.')
     PROXY_OK_FORMAT = '\n   {0:<35}  => {1} - Proxy OK'
     
-    def __init__(self, target_list, proxy_str):
+    def __init__(self, shared_settings, target_list, proxy_str):
         
+        self._shared_settings = shared_settings
         self._target_list = target_list
         self._proxy_str = proxy_str
         self._result_str = ''
@@ -121,14 +122,15 @@ class ServersConnectivityTester(ConnectivityTester):
 
     TARGET_OK_FORMAT = '\n   {0:<35} => {1}'
 
-    def __init__(self, target_list, starttls=None, xmpp_to=None):
+    def __init__(self, shared_settings, target_list, starttls=None, xmpp_to=None):
         
+        self._shared_settings = shared_settings
         self._target_list = target_list
         self._starttls = starttls
         self._xmpp_to = xmpp_to
         self._targets_OK = []
         self._targets_ERR = []
-
+        
    
     def test_connectivity(self,  timeout):
         """
@@ -172,14 +174,30 @@ class ServersConnectivityTester(ConnectivityTester):
           
  
     def _test_server(self, target, timeout):
-        
+        self._starttls_ports = self._shared_settings['starttls_ports']
+        target_port = target.split(':')
+
+        # Rewrite the starttls parameter based on port if set to auto.
+        if self._starttls == 'auto':
+            if len(target_port) == 2:
+                if int(target_port[1]) in self._starttls_ports:
+                    service = self._starttls_ports[int(target_port[1])]
+                    if service == 'smtp':
+                        server_test = SMTPServerTester(target)
+                    elif service == 'xmpp':
+                        server_test = XMPPServerTester(target, self._xmpp_to)
+                    else:
+                        server_test = SSLServerTester(target)
+            else:
+                server_test = SSLServerTester(target)
+                
         if self._starttls == 'smtp':
             server_test = SMTPServerTester(target)
         elif self._starttls == 'xmpp':
             server_test = XMPPServerTester(target, self._xmpp_to)
         else:
             server_test = SSLServerTester(target)
-            
+
         return server_test.test_connectivity(timeout)
 
 
@@ -300,7 +318,7 @@ class SMTPServerTester(SSLServerTester):
         if '250 ' not in s.recv(2048):
             raise InvalidTargetError(self._target_str, self.ERR_SMTP_REJECTED)
                 
-        # Semd a STARTTLS
+        # Send a STARTTLS
         s.send('STARTTLS\r\n')
         smtp_resp = s.recv(2048)
         if 'Ready to start TLS'  not in smtp_resp:
