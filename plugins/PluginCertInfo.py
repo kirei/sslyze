@@ -272,18 +272,16 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         ev_result = self._is_ev_certificate(cert_dict)
 
+        is_ev = False
         if 'NO_POLICY' in ev_result:
-            is_ev = False
-            txt_result.append(self.FIELD_FORMAT.format("X509 EV Policy in certificate:", 'False'))
+            txt_result.append(self.FIELD_FORMAT.format("X509 Policy in certificate:", 'False'))
+
         else:
-            txt_result.append(self.FIELD_FORMAT.format("X509 EV Policy in certificate:", 'True'))
-            is_ev = True
+            txt_result.append(self.FIELD_FORMAT.format("X509 Policy in certificate:", 'True'))
             for ev in ev_result:
                 if ev_result[ev]:
-                    txt_result.append(self.FIELD_FORMAT.format("Extended Validation with:", ev))
-                else:
-                    is_ev = False
-                    txt_result.append(self.FIELD_FORMAT.format("NOT Extended Validation with:", ev))
+                    txt_result.append(self.FIELD_FORMAT.format("Policy recognized as EV with:", ev))
+                    is_ev = True
         
         is_host_valid = self._is_hostname_valid(cert_dict, target)
         host_txt = 'OK - ' + is_host_valid + ' Matches' if is_host_valid \
