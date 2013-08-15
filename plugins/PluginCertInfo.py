@@ -271,14 +271,19 @@ class PluginCertInfo(PluginBase.PluginBase):
                                                            ca_name + ' - ' + verify_result[ca_name]))
 
         ev_result = self._is_ev_certificate(cert_dict)
-        is_ev = True
-        for ev in ev_result:
-            if ev_result[ev]:
-                txt_result.append(self.FIELD_FORMAT.format("Extended Validation with:", ev))
-            else:
-                is_ev = False
-                txt_result.append(self.FIELD_FORMAT.format("NOT Extended Validation with:", ev))
 
+        if 'NO_POLICY' in ev_result:
+            is_ev = False
+            txt_result.append(self.FIELD_FORMAT.format("X509 EV Policy in certificate:", 'False'))
+        else:
+            txt_result.append(self.FIELD_FORMAT.format("X509 EV Policy in certificate:", 'True'))
+            is_ev = True
+            for ev in ev_result:
+                if ev_result[ev]:
+                    txt_result.append(self.FIELD_FORMAT.format("Extended Validation with:", ev))
+                else:
+                    is_ev = False
+                    txt_result.append(self.FIELD_FORMAT.format("NOT Extended Validation with:", ev))
         
         is_host_valid = self._is_hostname_valid(cert_dict, target)
         host_txt = 'OK - ' + is_host_valid + ' Matches' if is_host_valid \
@@ -338,10 +343,13 @@ class PluginCertInfo(PluginBase.PluginBase):
     
     def _is_ev_certificate(self, cert_dict):
         ev_result = {}
-        
+        policy = None
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
-            
+        except:
+            pass
+
+        if policy:
             for ev_name in EV_DB:
                 ev_match = False
                 ev_result[ev_name] = ev_match
@@ -356,10 +364,9 @@ class PluginCertInfo(PluginBase.PluginBase):
                             print
                         ev_match = True
                 ev_result[ev_name] = ev_match
-                
-            return ev_result
-        except:
-            return ev_result
+        else:
+            ev_result['NO_POLICY'] = True
+
         return ev_result
         
     
