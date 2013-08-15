@@ -33,6 +33,7 @@
 
 from plugins import PluginBase
 from xml.etree.ElementTree import Element
+import ssl
 import httplib
 import os
 
@@ -73,7 +74,7 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
             self.https_connection.request("HEAD", "/", headers={"Connection": "close"})
             self.https_response = self.https_connection.getresponse()
             self.https_headers = self.https_response.getheaders()
-        except ssl.SSLError as self.https_error:
+        except httplib.HTTPException as self.https_error:
             pass
         finally:
             self.https_connection.close()
