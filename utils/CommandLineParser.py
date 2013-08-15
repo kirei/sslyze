@@ -162,6 +162,17 @@ class CommandLineParser():
             type='int',
             dest='timeout',
             default=timeout)
+
+    
+        # Verbosity
+        self._parser.add_option(
+            '--verbosity',
+            help= (
+                'Increases the verbosity of the program. '
+                'Usable values in the range 0..3. Default is 0.'),
+            type='int',
+            dest='verbosity',
+            default=0)
     
         
         # HTTP CONNECT Proxy

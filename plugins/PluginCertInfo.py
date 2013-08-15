@@ -25,7 +25,10 @@
 
 import os
 import re
-import imp
+import urllib2
+import subprocess
+import hashlib
+import json
 from xml.etree.ElementTree import Element
 
 from plugins import PluginBase
@@ -33,22 +36,29 @@ from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, constants, \
     X509_V_CODES, SSL_CTX
 from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 
-import urllib2
-import subprocess
-import hashlib
-import json
-
-# Import Mozilla trust store and EV OIDs
-DATA_PATH = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
-MOZILLA_CA_STORE = os.path.join(DATA_PATH, 'mozilla_cacert.pem')
-MOZILLA_EV_OIDS = imp.load_source('mozilla_ev_oids',
-                                  os.path.join(DATA_PATH,  'mozilla_ev_oids.py')).MOZILLA_EV_OIDS
-
 # Defines for CRL parsing using OpenSSL crl command.
 CRL_CACHE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'crl')
 OPENSSL = "openssl"
 OPENSSL_CLR_CMD = " crl -noout -text -inform DER -in "
 
+# Import Trust Stores and EV data (OIDs and fingerprints) during module init.
+EV_DB = {}
+load_data_path = os.path.join(os.path.dirname(PluginBase.__file__) , 'data')
+all_data_files = os.listdir(load_data_path)
+ev_files_to_load = []
+ca_files_to_load = []
+for filename in all_data_files:
+    if "_ev_" and ".json" in filename:
+        ev_files_to_load.append(filename)
+
+    if ".pem" in filename:
+        ca_files_to_load.append(os.path.join(load_data_path, filename))
+
+for filename in ev_files_to_load:
+    name = filename.split('_')
+    with open(os.path.join(load_data_path, filename)) as json_file:
+        json_data = json.load(json_file)
+    EV_DB[name[0]] = json_data
 
 class X509CertificateHelper:
     # TODO: Move this somewhere else
@@ -58,6 +68,7 @@ class X509CertificateHelper:
     
     def __init__(self, certificate):
         self._cert = certificate
+
         
     def parse_certificate(self):
         cert_dict = \
@@ -88,7 +99,7 @@ class X509CertificateHelper:
                 cert_xml.append(xml_elem)
  
         return cert_xml
-
+            
 
     def _create_xml_node(self, key, value=''):
         key = key.replace(' ', '').strip() # Remove spaces
@@ -130,7 +141,6 @@ class X509CertificateHelper:
 
 
     def _parse_multi_valued_extension(self, extension):
-        
         extension = extension.split(', ')
         # Split the (key,value) pairs
         parsed_ext = {}
@@ -186,7 +196,6 @@ class X509CertificateHelper:
         
                 
     def _get_all_extensions(self):
-
         ext_dict = self._cert.get_extension_list().get_all_extensions()
 
         parsing_functions = {'X509v3 Subject Alternative Name': self._parse_multi_valued_extension,
@@ -226,7 +235,9 @@ class PluginCertInfo(PluginBase.PluginBase):
     FIELD_FORMAT = '      {0:<35}{1:<35}'
     
     def process_task(self, target, command, arg):
-
+        if self._shared_settings['verbosity'] > 2:
+            print "Processing %s" % target[0]
+            
         ctSSL_initialize()
         try: # Get the certificate
             (cert, verify_result) = self._get_cert(target)
@@ -237,10 +248,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Figure out if/why the verification failed
         untrusted_reason = None
         is_cert_trusted = True
-        if verify_result != 0:
-            is_cert_trusted = False
-            untrusted_reason = X509_V_CODES.X509_V_CODES[verify_result]
-         
+        for ca_name in verify_result:
+            if verify_result[ca_name] != 'ok':
+                is_cert_trusted = False
+                untrusted_reason = ca_name + ' - ' + verify_result[ca_name]
+        
         # Results formatting
         cert_parsed = X509CertificateHelper(cert)
         cert_dict = cert_parsed.parse_certificate()
@@ -277,18 +289,31 @@ class PluginCertInfo(PluginBase.PluginBase):
         if self._shared_settings['sni']:
             sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
             txt_result.append(self.FIELD_FORMAT.format("SNI:", sni_text))
-        
-        trust_txt = 'Certificate is Trusted' if is_cert_trusted \
-                                             else 'Certificate is NOT Trusted'
 
-        is_ev = self._is_ev_certificate(cert_dict)
-        if is_ev:
-            trust_txt = trust_txt + ' - Extended Validation'
-            
-        if untrusted_reason:
-            trust_txt = trust_txt + ': ' + untrusted_reason
+        if is_cert_trusted:
+            txt_result.append(self.FIELD_FORMAT.format("Trusted or NOT Trusted:", "Trusted"))
+        else:
+            txt_result.append(self.FIELD_FORMAT.format("Trusted or NOT Trusted:", "NOT Trusted"))
 
-        txt_result.append(self.FIELD_FORMAT.format("Validation w/ Mozilla's CA Store:", trust_txt))
+        for ca_name in verify_result:
+            if verify_result[ca_name] == 'ok':
+                txt_result.append(self.FIELD_FORMAT.format("Validated by Trust Store: ", ca_name))
+            else:
+                txt_result.append(self.FIELD_FORMAT.format("Not validated by Trust Store: ",
+                                                           ca_name + ' - ' + verify_result[ca_name]))
+
+        ev_result = self._is_ev_certificate(cert_dict)
+
+        is_ev = False
+        if 'NO_POLICY' in ev_result:
+            txt_result.append(self.FIELD_FORMAT.format("X509 Policy in certificate:", 'False'))
+
+        else:
+            txt_result.append(self.FIELD_FORMAT.format("X509 Policy in certificate:", 'True'))
+            for ev in ev_result:
+                if ev_result[ev]:
+                    txt_result.append(self.FIELD_FORMAT.format("Policy recognized as EV with:", ev))
+                    is_ev = True
         
         is_host_valid = self._is_hostname_valid(cert_dict, target)
         host_txt = 'OK - ' + is_host_valid + ' Matches' if is_host_valid \
@@ -304,7 +329,7 @@ class PluginCertInfo(PluginBase.PluginBase):
                         else False
             
         xml_result = Element(command, argument = arg, title = cmd_title)
-        trust_xml_attr = {'isTrustedByMozillaCAStore' : str(is_cert_trusted),
+        trust_xml_attr = {'isTrustedByAllCAStores' : str(is_cert_trusted),
                           'sha1Fingerprint' : fingerprint,
                           'isExtendedValidation' : str(is_ev),
                           'hasMatchingHostname' : str(host_xml)}
@@ -337,8 +362,6 @@ class PluginCertInfo(PluginBase.PluginBase):
         return PluginBase.PluginResult(txt_result, xml_result)
 
 
-# FORMATTING FUNCTIONS
-
     def _is_hostname_valid(self, cert_dict, target):
         (host, ip, port) = target
         
@@ -347,7 +370,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         if _dnsname_to_pat(commonName).match(host):
             return 'Common Name'
         
-        try: # No luch, let's look at Subject Alternative Names
+        try: # No luck, let's look at Subject Alternative Names
             alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
         except KeyError:
             return False
@@ -467,15 +490,34 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         return self.crl_result
         
-
+    
     def _is_ev_certificate(self, cert_dict):
+        ev_result = {}
+        policy = None
         try:
             policy = cert_dict['extensions']['X509v3 Certificate Policies']['Policy']
-            if policy[0] in MOZILLA_EV_OIDS:
-                return True
         except:
-            return False
-        return False
+            pass
+
+        if policy:
+            for ev_name in EV_DB:
+                ev_match = False
+                ev_result[ev_name] = ev_match
+                tmp_ev_db = EV_DB[ev_name]
+                for db in tmp_ev_db:
+                    tmp_db = tmp_ev_db[db]
+                    if policy[0] == tmp_db['oid']:
+                        if self._shared_settings['verbosity'] > 1:
+                            print "Matched OID: %s" % tmp_db['oid']
+                            print "Fingerprint: %s" % tmp_db['fingerprint']
+                            print "Info: %s" % tmp_db['info']
+                            print
+                        ev_match = True
+                ev_result[ev_name] = ev_match
+        else:
+            ev_result['NO_POLICY'] = True
+
+        return ev_result
         
     
     def _get_basic_text(self, cert,  cert_dict):      
@@ -508,26 +550,37 @@ class PluginCertInfo(PluginBase.PluginBase):
     def _get_cert(self, target):
         """
         Connects to the target server and returns the server's certificate
+        Also performs verification against Trust Stores. One SSL context
+        for each Trust Store.
         """
-        verify_result = None
-        ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
-        ssl_ctx.load_verify_locations(MOZILLA_CA_STORE)
-        ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
-        ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
+        verify_result = {}
+        for ca_file in ca_files_to_load:
+            ca_name = (ca_file.split('/')[-1]).split('.')[0]
+            ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
+            ssl_ctx.load_verify_locations(ca_file)
+            
+            ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
+            ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
                                           hello_workaround=True)
 
-        try: # Perform the SSL handshake
-            ssl_connect.connect()
-            cert = ssl_connect._ssl.get_peer_certificate()
-            verify_result = ssl_connect._ssl.get_verify_result()
-        
-        except ClientCertificateError: # The server asked for a client cert
-            # We can get the server cert anyway
-            cert = ssl_connect._ssl.get_peer_certificate()
-            verify_result = ssl_connect._ssl.get_verify_result()            
+            if self._shared_settings['verbosity'] > 2:
+                print "Shared settings:"
+                print self._shared_settings
+
+            try: # Perform the SSL handshake
+                ssl_connect.connect()
+                cert = ssl_connect._ssl.get_peer_certificate()
+                tmp_verify_result = ssl_connect._ssl.get_verify_result()
             
-        finally:
-            ssl_connect.close()
+            except ClientCertificateError: # The server asked for a client cert
+                # We can get the server cert anyway
+                cert = ssl_connect._ssl.get_peer_certificate()
+                tmp_verify_result = ssl_connect._ssl.get_verify_result()            
+            
+            finally:
+                ssl_connect.close()
+
+            verify_result[ca_name] = X509_V_CODES.X509_V_CODES[tmp_verify_result]
 
         return (cert, verify_result)
 
