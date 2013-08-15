@@ -34,7 +34,6 @@
 from plugins import PluginBase
 from xml.etree.ElementTree import Element
 import httplib
-import ssl
 import os
 
 RULE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'rules')
