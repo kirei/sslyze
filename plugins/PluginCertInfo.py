@@ -260,13 +260,16 @@ class PluginCertInfo(PluginBase.PluginBase):
                                              else 'Certificate is NOT Trusted'
 
         if self._shared_settings['ocsp']:
-            if self.ocsp_result['verified']:
-                ocsp_result_text = "Certificate verified by OCSP"
-            elif 'uri_error' in self.ocsp_result:
-                ocsp_result_text = "Problem loading OCSP Issuer CA. " + self.ocsp_result['uri_error']
+            if not self.ocsp_result['OCSP_PRESENT']:
+                ocsp_result_text = "OCSP Responder not in certificate"
             else:
-                ocsp_result_text = "Cerificate not verified by OCSP %s " % \
-                                  self.ocsp_result['response'][0]
+                if self.ocsp_result['verified']:
+                    ocsp_result_text = "Certificate verified by OCSP"
+                elif 'uri_error' in self.ocsp_result:
+                    ocsp_result_text = "Problem loading OCSP Issuer CA. " + self.ocsp_result['uri_error']
+                else:
+                    ocsp_result_text = "Cerificate not verified by OCSP %s " % \
+                                       self.ocsp_result['response'][0]
             txt_result.append(self.FIELD_FORMAT.format("OCSP verification:", ocsp_result_text))
 
 
@@ -348,16 +351,22 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         
     def _check_ocsp(self, cert):
+        self.ocsp_result = {}
+        self.ocsp_result['OCSP_PRESENT'] = False
+        self.ocsp_result['verified'] = False
+        try:
+            self.ocsp_responder = cert['extensions']['Authority Information Access']['OCSP']['URI'][0]
+        except:
+            return self.ocsp_result
+            
+        self.ocsp_result['OCSP_PRESENT'] = True
         self.ca_issuer = cert['extensions']['Authority Information Access']['CAIssuers']['URI'][0]
-        self.ocsp_responder = cert['extensions']['Authority Information Access']['OCSP']['URI'][0]
         self.cert_id = cert['serialNumber']
         self.ocsp_filename_hash_prefix = hashlib.sha1(self.ca_issuer).hexdigest()
         self.ocsp_crt_filename = self.ocsp_filename_hash_prefix + ".crt"
         self.ocsp_pem_filename = self.ocsp_filename_hash_prefix + ".pem"
         self.ocsp_err_filename = self.ocsp_filename_hash_prefix + ".err"
         self.all_ocsp_files = os.listdir(OCSP_CACHE_DIR)
-        self.ocsp_result = {}
-        self.ocsp_result['verified'] = False
 
         if self.ocsp_err_filename in self.all_ocsp_files:
             with open(OCSP_CACHE_DIR + '/' + self.ocsp_err_filename, 'rb') as self.ocsp_err_file:
