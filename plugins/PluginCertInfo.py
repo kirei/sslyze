@@ -261,7 +261,7 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         if self._shared_settings['ocsp']:
             if not self.ocsp_result['OCSP_PRESENT']:
-                ocsp_result_text = "OCSP Responder not in certificate"
+                ocsp_result_text = "No OCSP Responder in certificate"
             else:
                 if self.ocsp_result['verified']:
                     ocsp_result_text = "Certificate not revoked"
