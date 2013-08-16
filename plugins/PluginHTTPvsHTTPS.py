@@ -36,6 +36,8 @@ from xml.etree.ElementTree import Element
 import httplib
 import ssl
 import os
+from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, SSL_CTX
+from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 
 RULE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'rules')
 
@@ -64,21 +66,22 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
             self.http_response = self.http_connection.getresponse()
             self.http_headers = self.http_response.getheaders()
         except httplib.HTTPException as self.http_error:
-            pass
+            self.http_error = True
         finally:
             self.http_connection.close()
 
-        self.https_connection = httplib.HTTPSConnection(host, 443)
+        ctSSL_initialize()
+        self.ssl_ctx = SSL_CTX.SSL_CTX('tlsv1')
+        self.ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,self.ssl_ctx,
+                                               hello_workaround=True)
         try:
-            self.https_connection.connect()
-            self.https_connection.request("HEAD", "/", headers={"Connection": "close"})
-            self.https_response = self.https_connection.getresponse()
-            self.https_headers = self.https_response.getheaders()
-        except ssl.SSLError as self.https_error:
-            pass
+            self.ssl_connect.connect()
+        except:
+            self.https_error = True
         finally:
-            self.https_connection.close()
-
+            self.ssl_connect.close()
+        ctSSL_cleanup()
+        
         # If we could connect to the host using both
         # http and https we generate a rule for the host.
         if not self.http_error and not self.https_error:
