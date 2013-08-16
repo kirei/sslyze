@@ -264,12 +264,11 @@ class PluginCertInfo(PluginBase.PluginBase):
                 ocsp_result_text = "OCSP Responder not in certificate"
             else:
                 if self.ocsp_result['verified']:
-                    ocsp_result_text = "Certificate verified by OCSP"
+                    ocsp_result_text = "Certificate not revoked"
                 elif 'uri_error' in self.ocsp_result:
                     ocsp_result_text = "Problem loading OCSP Issuer CA. " + self.ocsp_result['uri_error']
                 else:
-                    ocsp_result_text = "Cerificate not verified by OCSP %s " % \
-                                       self.ocsp_result['response'][0]
+                    ocsp_result_text = "Cerificate revoked"
             txt_result.append(self.FIELD_FORMAT.format("OCSP verification:", ocsp_result_text))
 
 
