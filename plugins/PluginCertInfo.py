@@ -276,7 +276,9 @@ class PluginCertInfo(PluginBase.PluginBase):
 
         # Create text result for any CRL checks done.
         if self._shared_settings['crl']:
-            if self.crl_result['verified']:
+            if self.crl_result['NO_CRL']:
+                crl_result_text = "No CRL URI in certificate"
+            elif self.crl_result['verified']:
                 crl_result_text = "Certificate not revoked in CRL"
             elif 'uri_error' in self.crl_result:
                 crl_result_text = "Problem loading CRL. " + self.crl_result['uri_error']
@@ -390,8 +392,13 @@ class PluginCertInfo(PluginBase.PluginBase):
     def _check_crl(self, cert):
         self.crl_result = {}
         self.crl_result['verified'] = False
+        self.crl_uri = None
+        try:
+            self.crl_uri = cert['extensions']['X509v3 CRL Distribution Points']['URI'][0]
+        except:
+            self.crl_result['NO_CRL'] = True
+            return self.crl_result
 
-        self.crl_uri = cert['extensions']['X509v3 CRL Distribution Points']['URI'][0]
         self.cert_id = cert['serialNumber']
         
         self.filename_hash_prefix = hashlib.sha1(self.crl_uri).hexdigest()
