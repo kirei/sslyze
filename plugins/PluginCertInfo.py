@@ -370,6 +370,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         if _dnsname_to_pat(commonName).match(host):
             return 'Common Name'
         
+        # Check SNI.
+        if self._shared_settings['sni']:
+            if _dnsname_to_pat(commonName).match(self._shared_settings['sni']):
+                return 'SNI'
+        
         try: # No luck, let's look at Subject Alternative Names
             alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
         except KeyError:
