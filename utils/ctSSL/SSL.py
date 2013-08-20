@@ -161,7 +161,7 @@ class SSL:
 
     def do_client_handshake(self):
         """
-        Peform a SSL handshake as the client.
+        Perform a SSL handshake as the client.
 
         The socket associated to that SSL connection is expected to already
         be connected to the server (using socket.connect()), when
