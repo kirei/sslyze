@@ -265,10 +265,17 @@ class PluginCertInfo(PluginBase.PluginBase):
             else:
                 if self.ocsp_result['verified']:
                     ocsp_result_text = "Certificate not revoked"
+
+                elif self.ocsp_result['revoked']:
+                    ocsp_result_text = "Cerificate revoked. "
+
+                elif self.ocsp_result['error']:
+                    ocsp_result_text = "Error querying OCSP responder. "
+                    
                 elif 'uri_error' in self.ocsp_result:
                     ocsp_result_text = "Problem loading OCSP Issuer CA. " + self.ocsp_result['uri_error']
                 else:
-                    ocsp_result_text = "Cerificate revoked"
+                    ocsp_result_text = "Unknown problem performing OCSP verification. "
             txt_result.append(self.FIELD_FORMAT.format("OCSP verification:", ocsp_result_text))
 
 
@@ -353,9 +360,12 @@ class PluginCertInfo(PluginBase.PluginBase):
         self.ocsp_result = {}
         self.ocsp_result['OCSP_PRESENT'] = False
         self.ocsp_result['verified'] = False
+        self.ocsp_result['error'] = False
+        self.ocsp_result['revoked'] = False
         try:
             self.ocsp_responder = cert['extensions']['Authority Information Access']['OCSP']['URI'][0]
         except:
+            self.ocsp_result['error'] = True
             return self.ocsp_result
             
         self.ocsp_result['OCSP_PRESENT'] = True
@@ -409,6 +419,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         self.ocsp_result['response'] = self.ocsp_text_data.split('\n')
         if "good" in self.ocsp_text_data:
             self.ocsp_result['verified'] = True
+        elif "Error" in self.ocsp_text_data:
+            self.ocsp_result['error'] = True
+        elif "revoked" in self.ocsp_text_data:
+            self.ocsp_result['revoked'] = True
+            
         return self.ocsp_result
         
 
