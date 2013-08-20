@@ -35,7 +35,13 @@ SSLYZE_VERSION = 'SSLyze v0.7 beta'
 DEFAULT_NB_PROCESSES = 5
 DEFAULT_TIMEOUT =   5
 PROJECT_URL = "https://github.com/isecPartners/sslyze"
-STARTTLS_PORTS = {25:'smtp', 443:'https', 587:'smtp', 5222:'xmpp', 5269:'xmpp'}
+
+STARTTLS_PORTS = {21:'ftp',
+                  143:'imap', 220:'imap',
+                  389: 'ldap', 3268: 'ldap',
+                  109: 'pop3', 110: 'pop3',
+                  25:'smtp', 587:'smtp',
+                  5222:'xmpp', 5269:'xmpp'}
 
 # Todo: Move formatting stuff to another file
 SCAN_FORMAT = 'Scan Results For {0}:{1} - {2}:{1}'

@@ -189,9 +189,10 @@ class CommandLineParser():
         self._parser.add_option(
             '--starttls',
             help= (
-                'Identifies the target server(s) as a SMTP or an XMPP server(s) '
+                'Identifies the target server(s) protocols (FTP, SMTP, XMPP etc) '
                 'and scans the server(s) using STARTTLS. '
-                'STARTTLS should be \'smtp\' or \'xmpp\'. '
+                'STARTTLS should be \'ftp\', \'imap\', \'ldap\', '
+                '\'pop3\', \'smtp\' or \'xmpp\'. '
                 'Alternatively \'auto\' can be given and the protocol will be '
                 'selected based on the given port number.'),
             dest='starttls',
@@ -291,7 +292,7 @@ class CommandLineParser():
             shared_settings['https_tunnel_port'] = None
             
         # STARTTLS
-        if args_command_list.starttls not in [None,'auto','smtp','xmpp']:
+        if args_command_list.starttls not in [None,'auto', 'ftp', 'imap', 'ldap', 'pop3', 'smtp','xmpp']:
             raise CommandLineParsingError(
                 '--starttls should be \'smtp\', \'xmpp\' or \'auto\'.')
         
