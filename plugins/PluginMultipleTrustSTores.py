@@ -5,7 +5,7 @@
 #               several trust stores.
 #               certificate. Based on the PluginCertInfo plugin.
 #
-# Author:       aaron, alban
+# Author:       aaron, alban, joachims
 #
 # Copyright:    2012 SSLyze developers
 #
