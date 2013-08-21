@@ -15,3 +15,5 @@ Contributors
 Tom Samstag
 Loïc Simon
 Tom Ritter
+Joachim Strömbergson
+Jakon Schlyter
