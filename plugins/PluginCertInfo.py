@@ -402,7 +402,13 @@ class PluginCertInfo(PluginBase.PluginBase):
             return self.ocsp_result
             
         self.ocsp_result['OCSP_PRESENT'] = True
-        self.ca_issuer = cert['extensions']['Authority Information Access']['CAIssuers']['URI'][0]
+
+        try:
+            self.ca_issuer = cert['extensions']['Authority Information Access']['CAIssuers']['URI'][0]
+        except:
+            self.ocsp_result['uri_error'] = "No CAIssuers field in certificate."
+            return self.ocsp_result
+            
         self.cert_id = cert['serialNumber']
         self.ocsp_filename_hash_prefix = hashlib.sha1(self.ca_issuer).hexdigest()
         self.ocsp_crt_filename = self.ocsp_filename_hash_prefix + ".crt"
