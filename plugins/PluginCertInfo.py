@@ -42,6 +42,8 @@ OPENSSL = "openssl"
 OPENSSL_CLR_CMD = " crl -noout -text -inform DER -in "
 CRL_CACHE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'crl')
 OCSP_CACHE_DIR = os.path.join(os.path.dirname(PluginBase.__file__), 'ocsp')
+CHECK_OCSP_PATH = os.path.join(os.path.dirname(PluginBase.__file__), '../utils/scripts')
+
 
 # Import Trust Stores and EV data (OIDs and fingerprints) during module init.
 EV_DB = {}
@@ -440,21 +442,20 @@ class PluginCertInfo(PluginBase.PluginBase):
                              stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT).stdout.read()
             
-        self.openssl_ocsp_cmd = OPENSSL + " ocsp" + " -issuer " +\
-                                       OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename +\
-                                       " -serial " + "0x" + self.cert_id +\
-                                       " -url " + self.ocsp_responder +\
-                                       " -noverify -no_nonce"
-        self.ocsp_text_data = subprocess.Popen(self.openssl_ocsp_cmd, shell=True,
+        self.check_ocsp_cmd = CHECK_OCSP_PATH + "/check-ocsp.sh " + self.ocsp_responder +\
+                              " " + OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename +\
+                                       " " + self.cert_id
+        
+        self.ocsp_response_data = subprocess.Popen(self.check_ocsp_cmd, shell=True,
                                                stdout=subprocess.PIPE,
                                                stderr=subprocess.STDOUT).stdout.read()
 
-        self.ocsp_result['response'] = self.ocsp_text_data.split('\n')
-        if "good" in self.ocsp_text_data:
+        self.ocsp_result['response'] = self.ocsp_response_data.split('\n')
+        if "good" in self.ocsp_response_data:
             self.ocsp_result['verified'] = True
-        elif "Error" in self.ocsp_text_data:
+        elif "Error" in self.ocsp_response_data:
             self.ocsp_result['error'] = True
-        elif "revoked" in self.ocsp_text_data:
+        elif "revoked" in self.ocsp_response_data:
             self.ocsp_result['revoked'] = True
             
         return self.ocsp_result
