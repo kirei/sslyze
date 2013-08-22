@@ -30,6 +30,9 @@
 #   along with SSLyze.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
 
+import os
+import subprocess
+
 from xml.etree.ElementTree import Element
 import httplib
 from plugins import PluginBase
@@ -52,22 +55,21 @@ class PluginHSTS(PluginBase.PluginBase):
         hsts_supported = False
         hsts_timeout = ""
         (host, addr, port) = target
-        connection = httplib.HTTPSConnection(host)
-        try:
-            connection.connect()
-            connection.request("HEAD", "/", headers={"Connection": "close"})
-            response = connection.getresponse()
-            headers = response.getheaders()
-            for (field, data) in headers:
-                if field == 'strict-transport-security':
-                    hsts_supported = True
-                    hsts_timeout = data
 
-        except httplib.HTTPException as ex:
-            print "Error: %s" % ex
+        self.curl_command = 'curl -I ' + 'https://' + host
+        self.hsts_text_data = subprocess.Popen(self.curl_command, shell=True,
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT).stdout.read()
 
-        finally:
-            connection.close()
+
+        self.split_header = self.hsts_text_data.split(':')
+        for element in self.split_header:
+            if 'Strict-Transport-Security' in element:
+                hsts_supported = True
+        
+        for element in self.split_header:
+            if 'max-age' in element:
+                hsts_timeout = element
 
         # Text output
         cmd_title = 'HSTS'
