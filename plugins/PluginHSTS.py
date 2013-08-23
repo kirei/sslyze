@@ -69,7 +69,7 @@ class PluginHSTS(PluginBase.PluginBase):
         
         for element in self.split_header:
             if 'max-age' in element:
-                hsts_timeout = element
+                hsts_timeout = (element.strip()).splitlines()[0]
 
         # Text output
         cmd_title = 'HSTS'
