@@ -256,25 +256,36 @@ class PluginCertInfo(PluginBase.PluginBase):
         (host, ip, port) = target
         commonName = cert_dict['subject']['commonName'][0]
         
-        # Check SNI.
+        # Check SNI first
         if self._shared_settings['sni']:
             if _dnsname_to_pat(commonName).match(self._shared_settings['sni']):
-                return 'SNI ' + self._shared_settings['sni']
+                return 'SNI CN ' + self._shared_settings['sni']
+            else:
+                # Check if any AltName matces SNI.
+                try:
+                    alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
+                except KeyError:
+                    return False
         
-        # Not SNI - Let's try the common name first
-        if _dnsname_to_pat(commonName).match(host):
-            return 'Common Name ' + commonName
-        
-        try: # No luck, let's look at Subject Alternative Names
-            alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
-        except KeyError:
-            return False
-        
-        for altname in alt_names:
-            if _dnsname_to_pat(altname).match(host):
-                return 'Subject Alternative Name ' + altname       
-        
-        return False
+                for altname in alt_names:
+                    if _dnsname_to_pat(altname).match(self._shared_settings['sni']):
+                        return 'SNI SAN ' + altname
+                return False
+
+        else:
+            # Not SNI - Let's try the common name first
+            if _dnsname_to_pat(commonName).match(host):
+                return 'Common Name ' + commonName
+            else:
+                try:
+                    alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
+                except KeyError:
+                    return False
+                
+                for altname in alt_names:
+                    if _dnsname_to_pat(altname).match(host):
+                        return 'Subject Alternative Name ' + altname       
+                return False
 
 
     def _check_crl(self, cert):
