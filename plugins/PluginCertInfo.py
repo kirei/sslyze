@@ -254,16 +254,16 @@ class PluginCertInfo(PluginBase.PluginBase):
 # FORMATTING FUNCTIONS
     def _is_hostname_valid(self, cert_dict, target):
         (host, ip, port) = target
-        
-        # Let's try the common name first
         commonName = cert_dict['subject']['commonName'][0]
-        if _dnsname_to_pat(commonName).match(host):
-            return 'Common Name'
         
         # Check SNI.
         if self._shared_settings['sni']:
             if _dnsname_to_pat(commonName).match(self._shared_settings['sni']):
-                return 'SNI'
+                return 'SNI ' + self._shared_settings['sni']
+        
+        # Not SNI - Let's try the common name first
+        if _dnsname_to_pat(commonName).match(host):
+            return 'Common Name ' + commonName
         
         try: # No luck, let's look at Subject Alternative Names
             alt_names = cert_dict['extensions']['X509v3 Subject Alternative Name']['DNS']
@@ -272,7 +272,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         
         for altname in alt_names:
             if _dnsname_to_pat(altname).match(host):
-                return 'Subject Alternative Name'       
+                return 'Subject Alternative Name ' + altname       
         
         return False
 
