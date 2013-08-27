@@ -63,7 +63,7 @@ class SMTPConnection():
         # Send a STARTTLS
         sock.send('STARTTLS\r\n')
         smtp_resp = sock.recv(2048)
-        if 'Ready to start TLS'  not in smtp_resp: 
+        if '220'  not in smtp_resp: 
             raise SSLHandshakeError('SMTP STARTTLS not supported ?')
 
         # Do the SSL handshake

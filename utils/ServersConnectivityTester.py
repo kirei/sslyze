@@ -317,11 +317,11 @@ class SMTPServerTester(SSLServerTester):
         s.send('EHLO sslyze.scan\r\n')
         if '250 ' not in s.recv(2048):
             raise InvalidTargetError(self._target_str, self.ERR_SMTP_REJECTED)
-                
+
         # Send a STARTTLS
         s.send('STARTTLS\r\n')
         smtp_resp = s.recv(2048)
-        if 'Ready to start TLS'  not in smtp_resp:
+        if '220' not in smtp_resp:
             raise InvalidTargetError(self._target_str,self.ERR_NO_SMTP_STARTTLS)
 
 
