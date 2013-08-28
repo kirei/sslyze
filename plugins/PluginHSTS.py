@@ -36,6 +36,7 @@ import subprocess
 from xml.etree.ElementTree import Element
 import httplib
 from plugins import PluginBase
+from utils.ExternalCommand import ExternalCommand
 
 
 class PluginHSTS(PluginBase.PluginBase):
@@ -57,12 +58,10 @@ class PluginHSTS(PluginBase.PluginBase):
         (host, addr, port) = target
 
         self.curl_command = 'curl -I ' + 'https://' + host
-        self.hsts_text_data = subprocess.Popen(self.curl_command, shell=True,
-                                               stdout=subprocess.PIPE,
-                                               stderr=subprocess.STDOUT).stdout.read()
+        self.my_cmd = ExternalCommand(self.curl_command)
+        (self.status, self.data, self.error) = self.my_cmd.run(timeout=15)
 
-
-        self.split_header = self.hsts_text_data.split(':')
+        self.split_header = self.data.split(':')
         for element in self.split_header:
             if 'Strict-Transport-Security' in element:
                 hsts_supported = True
