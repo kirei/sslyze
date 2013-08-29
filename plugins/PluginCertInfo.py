@@ -26,7 +26,6 @@
 import os
 import re
 import urllib2
-import subprocess
 import hashlib
 import json
 from xml.etree.ElementTree import Element

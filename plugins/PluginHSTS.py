@@ -31,8 +31,6 @@
 #-------------------------------------------------------------------------------
 
 import os
-import subprocess
-
 from xml.etree.ElementTree import Element
 import httplib
 from plugins import PluginBase
