@@ -64,12 +64,12 @@ class PluginHSTS(PluginBase.PluginBase):
 
         self.split_header = self.hsts_text_data.split(':')
         for element in self.split_header:
-            if 'Strict-Transport-Security' in element:
+            if 'Strict-Transport-Security' or 'strict-transport-security' in element:
                 hsts_supported = True
         
         for element in self.split_header:
             if 'max-age' in element:
-                hsts_timeout = (element.strip()).splitlines()[0]
+                hsts_timeout = ((element.strip()).splitlines()[0]).split(';')[0]
 
         # Text output
         cmd_title = 'HSTS'
