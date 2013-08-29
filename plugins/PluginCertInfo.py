@@ -36,6 +36,7 @@ from utils.ctSSL import ctSSL_initialize, ctSSL_cleanup, constants, \
     X509_V_CODES, SSL_CTX
 from utils.SSLyzeSSLConnection import SSLyzeSSLConnection, ClientCertificateError
 from utils.CertParser import X509CertificateHelper, _dnsname_to_pat
+from utils.ExternalCommand import ExternalCommand
 
 # Defines for CRL parsing using OpenSSL crl command.
 OPENSSL = "openssl"
@@ -338,11 +339,11 @@ class PluginCertInfo(PluginBase.PluginBase):
                 self.crl_file.write(self.crl_der_data)
 
             # Extract crl data as formatted text using OpenSSL.
+            
             self.openssl_command = OPENSSL + OPENSSL_CLR_CMD +\
                               CRL_CACHE_DIR + "/" + self.crl_filename
-            self.crl_text_data = subprocess.Popen(self.openssl_command, shell=True,
-                                                  stdout=subprocess.PIPE,
-                                                  stderr=subprocess.STDOUT).stdout.read()
+            self.my_cmd = ExternalCommand(self.openssl_command)
+            (self.status, self.crl_text_data, self.error) = self.my_cmd.run(timeout=25)
 
             # Create a DB with the IDs, revocation date and possible
             # revocation reason for the extracted data.
@@ -435,6 +436,7 @@ class PluginCertInfo(PluginBase.PluginBase):
                 return self.ocsp_result
 
         elif self.ocsp_pem_filename not in self.all_ocsp_files:
+            # Create PEM file in OCSP cache.
             self.ocsp_der_data = None
             self.ocsp_target_handler = None
             self.ocsp_e = None
@@ -455,22 +457,22 @@ class PluginCertInfo(PluginBase.PluginBase):
                                        OCSP_CACHE_DIR + "/" + self.ocsp_crt_filename +\
                                        " -outform PEM" + " -out " +\
                                        OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename
-            subprocess.Popen(self.openssl_der_pem_cmd, shell=True,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT).stdout.read()
-            
+            self.my_cmd = ExternalCommand(self.openssl_der_pem_cmd)
+            (self.status, self.data, self.error) = self.my_cmd.run(timeout=25)
+
+        # PEM file present. We can now proceed to validate the cert
+        # against the OCSP responder.
         self.check_ocsp_cmd = CHECK_OCSP_PATH + "/check-ocsp.sh " + self.ocsp_responder +\
                               " " + OCSP_CACHE_DIR + "/" + self.ocsp_pem_filename +\
                                        " " + self.cert_id
-        
-        self.ocsp_response_data = subprocess.Popen(self.check_ocsp_cmd, shell=True,
-                                               stdout=subprocess.PIPE,
-                                               stderr=subprocess.STDOUT).stdout.read()
+
+        self.my_cmd = ExternalCommand(self.check_ocsp_cmd)
+        (self.status, self.ocsp_response_data, self.error) = self.my_cmd.run(timeout=25)
 
         self.ocsp_result['response'] = self.ocsp_response_data.split('\n')
         if "good" in self.ocsp_response_data:
             self.ocsp_result['verified'] = True
-        elif "Error" in self.ocsp_response_data:
+        elif "Error" in self.ocsp_response_data or self.status != 0:
             self.ocsp_result['error'] = True
         elif "revoked" in self.ocsp_response_data:
             self.ocsp_result['revoked'] = True
