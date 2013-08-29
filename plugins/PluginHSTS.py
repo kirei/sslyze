@@ -59,7 +59,7 @@ class PluginHSTS(PluginBase.PluginBase):
 
         self.curl_command = 'curl -I ' + 'https://' + host
         self.my_cmd = ExternalCommand(self.curl_command)
-        (self.status, self.data, self.error) = self.my_cmd.run(timeout=15)
+        (self.status, self.data, self.error) = self.my_cmd.run(timeout=25)
 
         self.split_header = self.data.split(':')
         for element in self.split_header:
@@ -73,13 +73,18 @@ class PluginHSTS(PluginBase.PluginBase):
         # Text output
         cmd_title = 'HSTS'
         txt_result = [self.PLUGIN_TITLE_FORMAT.format(cmd_title)]
-        if hsts_supported:
+        if self.status != 0:
+            txt_result.append(output_format.format("Timeout while querying server:", ""))
+        elif hsts_supported:
             txt_result.append(output_format.format("Supported:", hsts_timeout))
         else:
             txt_result.append(output_format.format("Not supported.", ""))
 
         # XML output
-        xml_hsts_attr = {'hsts_header_found': str(hsts_supported)}
+        if self.status != 0:
+            xml_hsts_attr = {'hsts_error': str(True)}
+        else:
+            xml_hsts_attr = {'hsts_header_found': str(hsts_supported)}
         if hsts_supported:
             xml_hsts_attr['hsts_header'] = hsts_timeout
         xml_hsts = Element('hsts', attrib = xml_hsts_attr)
