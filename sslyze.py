@@ -128,8 +128,6 @@ def _format_txt_target_result(target, result_list):
 
 def main():
 
-    nb_processes = DEFAULT_NB_PROCESSES
-
     #--PLUGINS INITIALIZATION--
     start_time = time()
     print '\n\n\n' + _format_title('Registering available plugins')
@@ -150,6 +148,7 @@ def main():
         print e.get_error_msg()
         return
 
+    nb_processes = shared_settings['processes']
 
     shared_settings['starttls_ports'] = STARTTLS_PORTS
 

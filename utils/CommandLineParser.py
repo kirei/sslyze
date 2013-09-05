@@ -164,6 +164,17 @@ class CommandLineParser():
             default=timeout)
 
     
+        # Number of processes.
+        self._parser.add_option(
+            '--max_processes',
+            help= (
+                'Sets the maximum number of concurrent processes used '
+                ' for scanning. Default is 5 processes.'),
+            type='int',
+            dest='processes',
+            default=timeout)
+
+    
         # Verbosity
         self._parser.add_option(
             '--verbosity',
