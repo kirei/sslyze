@@ -58,7 +58,7 @@ class PluginHTTPvsHTTPS(PluginBase.PluginBase):
         self.http_error = None
         self.https_error = None
 
-        self.http_connection = httplib.HTTPConnection(host, 80)
+        self.http_connection = httplib.HTTPConnection(host, 80, timeout=15)
         try:
             self.http_connection.connect()
             self.http_connection.request("HEAD", "/", headers={"Connection": "close"})
