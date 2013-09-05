@@ -221,10 +221,12 @@ class PluginCertInfo(PluginBase.PluginBase):
             trust_xml_attr['sni'] = self._shared_settings['sni']
 
         if self._shared_settings['crl']:
-            if self.crl_result['verified']:
-                trust_xml_attr['crl'] = "verified"
+            if self.crl_result['NO_CRL']:
+                trust_xml_attr['crl'] = "no crl extension"
             elif 'uri_error' in self.crl_result:
                 trust_xml_attr['crl'] = self.crl_result['uri_error']
+            elif self.crl_result['verified']:
+                trust_xml_attr['crl'] = "verified"
             else:
                 trust_xml_attr['crl'] = "revoked"
 
