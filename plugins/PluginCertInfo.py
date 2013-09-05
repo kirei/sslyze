@@ -229,12 +229,18 @@ class PluginCertInfo(PluginBase.PluginBase):
                 trust_xml_attr['crl'] = "revoked"
 
         if self._shared_settings['ocsp']:
-            if self.ocsp_result['verified']:
+            if self.ocsp_result['revoked']:
+                trust_xml_attr['ocsp'] = "certificate revoked"
+            elif self.ocsp_result['error']:
+                trust_xml_attr['ocsp'] = "error querying responder"
+            elif self.ocsp_result['verified']:
                 trust_xml_attr['ocsp'] = "verified"
             elif 'uri_error' in self.ocsp_result:
                 trust_xml_attr['ocsp'] = self.ocsp_result['uri_error']
+            elif not self.ocsp_result['OCSP_PRESENT']:
+                trust_xml_attr['ocsp'] = "no ocsp in cert"
             else:
-                trust_xml_attr['ocsp'] = "ocsp"
+                trust_xml_attr['ocsp'] = "Unhandled problem with ocsp"
             
         trust_xml = Element('certificate', attrib = trust_xml_attr)
         
@@ -471,10 +477,10 @@ class PluginCertInfo(PluginBase.PluginBase):
         self.ocsp_result['response'] = self.ocsp_response_data.split('\n')
         if "good" in self.ocsp_response_data:
             self.ocsp_result['verified'] = True
-        elif "Error" in self.ocsp_response_data or self.status != 0:
-            self.ocsp_result['error'] = True
         elif "revoked" in self.ocsp_response_data:
             self.ocsp_result['revoked'] = True
+        elif "Error" in self.ocsp_response_data or self.status != 0:
+            self.ocsp_result['error'] = True
             
         return self.ocsp_result
     
@@ -569,5 +575,5 @@ class PluginCertInfo(PluginBase.PluginBase):
                 ssl_connect.close()
 
             verify_result[ca_name] = X509_V_CODES.X509_V_CODES[tmp_verify_result]
-
         return (cert, verify_result)
+
