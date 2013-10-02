@@ -567,8 +567,8 @@ class PluginCertInfo(PluginBase.PluginBase):
             ssl_ctx.load_verify_locations(ca_file)
             
             ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
-            ssl_connect = SSLyzeSSLConnection(self._shared_settings, target,ssl_ctx,
-                                          hello_workaround=True)
+            ssl_connect = SSLyzeSSLConnection(self._shared_settings, target, ssl_ctx,
+                                              hello_workaround=True)
 
             if self._shared_settings['verbosity'] > 2:
                 print "Shared settings:"
