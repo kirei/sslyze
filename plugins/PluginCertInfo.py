@@ -149,10 +149,7 @@ class PluginCertInfo(PluginBase.PluginBase):
 
 
         if self._shared_settings['sni']:
-            if self._shared_settings['sni'] == "auto":
-                sni_text = 'SNI enabled with virtual domain ' + target[0]
-            else:
-                sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
+            sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
             txt_result.append(self.FIELD_FORMAT.format("SNI:", sni_text))
 
         if is_cert_trusted:
@@ -221,10 +218,7 @@ class PluginCertInfo(PluginBase.PluginBase):
             trust_xml_attr['reasonWhyNotTrusted'] = untrusted_reason
 
         if self._shared_settings['sni']:
-            if self._shared_settings['sni'] == "auto":
-                trust_xml_attr['sni'] = target[0]
-            else:
-                trust_xml_attr['sni'] = self._shared_settings['sni']
+            trust_xml_attr['sni'] = self._shared_settings['sni']
 
         if self._shared_settings['crl']:
             if self.crl_result['NO_CRL']:
@@ -272,10 +266,7 @@ class PluginCertInfo(PluginBase.PluginBase):
         
         # Check SNI first
         if self._shared_settings['sni']:
-            if self._shared_settings['sni']:
-                self.sni_name = host
-            else:
-                self.sni_name = self._shared_settings['sni']
+            self.sni_name = self._shared_settings['sni']
                 
             if _dnsname_to_pat(commonName).match(self.sni_name):
                 return 'SNI CN ' + self.sni_name
@@ -561,6 +552,11 @@ class PluginCertInfo(PluginBase.PluginBase):
         for each Trust Store.
         """
         verify_result = {}
+
+        # Rewrite sni target to hostname if auto is set.
+        if self._shared_settings['sni'] == 'auto':
+            self._shared_settings['sni'] = target[0]
+        
         for ca_file in ca_files_to_load:
             ca_name = (ca_file.split('/')[-1]).split('.')[0]
             ssl_ctx = SSL_CTX.SSL_CTX('tlsv1') # sslv23 hello will fail for specific servers such as post.craigslist.org
