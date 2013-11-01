@@ -55,18 +55,24 @@ class PluginHSTS(PluginBase.PluginBase):
         hsts_timeout = ""
         (host, addr, port) = target
 
+        # Create Curl command to get header from host.
         curl_command = 'curl -I ' + 'https://' + host
         my_cmd = ExternalCommand(curl_command)
         (status, data, error) = my_cmd.run(timeout=25)
 
-        split_header = data.split(':')
-        for element in split_header:
-            if 'Strict-Transport-Security' or 'strict-transport-security' in element:
+        if self._shared_settings['verbosity'] > 1:
+            print "Result from Curl HSTS header command:"
+            print "status: %s" % status
+            print "data:"
+            print data
+            print
+
+        # Parse the header data for HSTS parameter.
+        for row in data.splitlines():
+            if 'strict-transport-security' in row.lower():
                 hsts_supported = True
-        
-        for element in split_header:
-            if 'max-age' in element:
-                hsts_timeout = ((element.strip()).splitlines()[0]).split(';')[0]
+                if 'max-age' in row.lower():
+                    hsts_timeout = row.lower().split(':')[1]
 
         # Text output
         cmd_title = 'HSTS'
