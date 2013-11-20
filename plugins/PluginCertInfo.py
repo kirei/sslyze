@@ -267,6 +267,13 @@ class PluginCertInfo(PluginBase.PluginBase):
         # Check SNI first
         if self._shared_settings['sni']:
             self.sni_name = self._shared_settings['sni']
+
+            if self._shared_settings['verbosity'] > 1:
+                print "SNI debug"
+                print "---------"
+                print "host: %s" % host
+                print "SNI name given: %s" % self.sni_name
+                print ""
                 
             if _dnsname_to_pat(commonName).match(self.sni_name):
                 return 'SNI CN ' + self.sni_name
