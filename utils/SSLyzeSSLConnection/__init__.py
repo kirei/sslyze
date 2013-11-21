@@ -141,7 +141,12 @@ class SSLyzeSSLConnection:
         
         # Add Server Name Indication
         if shared_settings['sni']:
-            ssl.set_tlsext_host_name(shared_settings['sni'])
+            if shared_settings['sni'] == 'auto':
+                if shared_settings['verbosity'] > 1:
+                    print "Inside SSLyzeSSLConnection. SNI Auto found. Remapping SNI to %s." % host
+                ssl.set_tlsext_host_name(host)
+            else:
+                ssl.set_tlsext_host_name(shared_settings['sni'])
         
         # Create the proper SMTP / XMPP / HTTPS connection
         if shared_settings['starttls'] == 'smtp':

@@ -93,6 +93,8 @@ class PluginCertInfo(PluginBase.PluginBase):
     def process_task(self, target, command, arg):
         if self._shared_settings['verbosity'] > 2:
             print "Processing %s" % target[0]
+
+        (host, ip, port) = target
             
         ctSSL_initialize()
         try: # Get the certificate
@@ -148,8 +150,12 @@ class PluginCertInfo(PluginBase.PluginBase):
             txt_result.append(self.FIELD_FORMAT.format("CRL verification:", crl_result_text))
 
 
+        # Text result for SNI.
         if self._shared_settings['sni']:
-            sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
+            if self._shared_settings['sni'] == 'auto':
+                sni_text = 'SNI enabled with virtual domain ' + host
+            else:
+                sni_text = 'SNI enabled with virtual domain ' + self._shared_settings['sni']
             txt_result.append(self.FIELD_FORMAT.format("SNI:", sni_text))
 
         if is_cert_trusted:
@@ -218,7 +224,10 @@ class PluginCertInfo(PluginBase.PluginBase):
             trust_xml_attr['reasonWhyNotTrusted'] = untrusted_reason
 
         if self._shared_settings['sni']:
-            trust_xml_attr['sni'] = self._shared_settings['sni']
+            if self._shared_settings['sni'] == 'auto':
+                trust_xml_attr['sni'] = host
+            else:
+                trust_xml_attr['sni'] = self._shared_settings['sni']
 
         if self._shared_settings['crl']:
             if self.crl_result['NO_CRL']:
@@ -266,7 +275,10 @@ class PluginCertInfo(PluginBase.PluginBase):
         
         # Check SNI first
         if self._shared_settings['sni']:
-            self.sni_name = self._shared_settings['sni']
+            if self._shared_settings['sni'] == 'auto':
+                self.sni_name = host
+            else:
+                self.sni_name = self._shared_settings['sni']
 
             if self._shared_settings['verbosity'] > 1:
                 print "SNI debug"
@@ -559,10 +571,6 @@ class PluginCertInfo(PluginBase.PluginBase):
         for each Trust Store.
         """
         verify_result = {}
-
-        # Rewrite sni target to hostname if auto is set.
-        if self._shared_settings['sni'] == 'auto':
-            self._shared_settings['sni'] = target[0]
         
         for ca_file in ca_files_to_load:
             ca_name = (ca_file.split('/')[-1]).split('.')[0]
@@ -572,10 +580,6 @@ class PluginCertInfo(PluginBase.PluginBase):
             ssl_ctx.set_verify(constants.SSL_VERIFY_NONE) # We'll use get_verify_result()
             ssl_connect = SSLyzeSSLConnection(self._shared_settings, target, ssl_ctx,
                                               hello_workaround=True)
-
-            if self._shared_settings['verbosity'] > 2:
-                print "Shared settings:"
-                print self._shared_settings
 
             try: # Perform the SSL handshake
                 ssl_connect.connect()
