@@ -271,9 +271,14 @@ class PluginCertInfo(PluginBase.PluginBase):
 # FORMATTING FUNCTIONS
     def _is_hostname_valid(self, cert_dict, target):
         (host, ip, port) = target
-        commonName = cert_dict['subject']['commonName'][0]
-        
-        # Check SNI first
+
+        # Check if there is a Common Name in the cert.
+        if 'commonName' in cert_dict['subject'].keys():
+            commonName = cert_dict['subject']['commonName'][0]
+        else:
+            commonName = "No Common Name in certificate."
+            
+        # Check SNI auto.
         if self._shared_settings['sni']:
             if self._shared_settings['sni'] == 'auto':
                 self.sni_name = host
@@ -538,8 +543,13 @@ class PluginCertInfo(PluginBase.PluginBase):
         
     
     def _get_basic_text(self, cert,  cert_dict):      
+        if 'commonName' in cert_dict['subject'].keys():
+            commonName = cert_dict['subject']['commonName'][0]
+        else:
+            commonName = "No Common Name in certificate."
+
         basic_txt = [ \
-        self.FIELD_FORMAT.format("Common Name:", cert_dict['subject']['commonName'][0] ),
+        self.FIELD_FORMAT.format("Common Name:", commonName),
         self.FIELD_FORMAT.format("Issuer:", cert.get_issuer_name().get_as_text()),
         self.FIELD_FORMAT.format("Serial Number:", cert_dict['serialNumber']),
         self.FIELD_FORMAT.format("Not Before:", cert_dict['validity']['notBefore']),
