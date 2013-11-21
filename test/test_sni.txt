@@ -1,1 +1,1 @@
-# python sslyze.py --certinfo=basic --sni=auto --verbosity=2 --targets_in test/se_targets.txt
+# python sslyze.py --certinfo=basic --sni=auto --verbosity=2 --targets_in test/sni_test_targets.txt
