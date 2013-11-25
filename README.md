@@ -16,6 +16,10 @@ servers.
 * Performance testing: session resumption and TLS tickets support
 * Security testing: weak cipher suites, insecure renegation, CRIME and THC-SSL DOS attacks
 * Server certificate validation
+* Support for certificate validation using OCSP and RCL
+* Check support for HSTS
+* Check support for SNI
+* Support for validation against different trust stores
 * Support for StartTLS with SMTP and XMPP, and traffic tunneling through an HTTPS proxy
 * Client certificate support for servers performing mutual authentication
 * Scan results can be written to an XML file for further processing
